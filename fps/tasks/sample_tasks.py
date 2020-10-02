@@ -6,18 +6,36 @@ from gvm.protocols.gmp import Gmp
 from gvm.transforms import EtreeTransform
 from gvm.xml import pretty_print
 
-def get_tasks(hostname, gmp_username, gmp_password):
+
+def create_tls_connection(gvm_hostname):
+    """
+    Creates TLS connection to GVM.
+
+    :param gvm_hostname: GVM hostname.
+    """
+    # TODO: error handling
+    return TLSConnection(hostname=gvm_hostname)
+
+def get_version(connection):
+    """
+    Gets GVMd version.
+    """
+    with Gmp(connection, transform=EtreeTransform()) as gmp:
+        # Retrieve GMP version supported by the remote daemon
+        version = gmp.get_version()
+
+        # Prints the XML in beautiful form
+        pretty_print(version)
+
+def get_tasks(connection, gmp_username, gmp_password):
     """
     Get names of tasks created on GVM.
 
-    :param hostname: gvmd hostname.
+    :param gvm_hostname: gvmd hostname.
     :param gmp_username: GMP username to use to access gvmd via TLS.
     :param gmp_password: GMP password to use to access gvmd via TLS.
     """
-    connection = TLSConnection(hostname=hostname)
-    transform = EtreeTransform()
-
-    with Gmp(connection, transform=transform) as gmp:
+    with Gmp(connection, transform=EtreeTransform()) as gmp:
         # Login
         gmp.authenticate(gmp_username, gmp_password)
 
