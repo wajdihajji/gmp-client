@@ -1,2 +1,2 @@
-gvm-tools==2.1.0
-python-gvm<2.0.0,>=1.6.0
+gvm-tools==20.10.1
+python-gvm==20.9.1
