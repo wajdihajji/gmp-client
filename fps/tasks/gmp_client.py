@@ -122,11 +122,6 @@ class GMPClient(object):
 
         return gmp.delete_scanner(scanner_id=scanners_xml[0].get('id'), ultimate=ultimate)
 
-    def function(self):
-        with Gmp(self.tls_connection, transform=EtreeTransform()) as gmp:
-            # Login
-            gmp.authenticate(self.gmp_username, self.gmp_password)
-
     def create_target(self, name, hosts, port_range, port_list_id=None):
         """
         Creates target.
