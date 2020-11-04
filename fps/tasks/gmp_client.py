@@ -22,7 +22,7 @@ def authenticate(func):
 
 class GMPClient(object):
     """
-    Creates a TLS connection to and runs tasks on a remote GVM daemon. 
+    Creates a TLS connection to and runs tasks on a remote GVM daemon.
     """
     def __init__(self, gvm_hostname, gvm_port, gmp_username, gmp_password, certs_path=None):
         self.gvm_hostname = gvm_hostname
