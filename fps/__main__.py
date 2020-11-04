@@ -1,9 +1,10 @@
 """
-Invoke the fps routines.
+Calling the main function.
 """
 import configparser
 
-from tasks.sample_tasks import create_tls_connection, get_version, get_tasks
+from tasks import gmp_client
+
 
 def main():
     """
@@ -12,15 +13,28 @@ def main():
     config = configparser.ConfigParser()
     config.read('config.ini')
 
-    print("Running FPS routines...")
-    connection = create_tls_connection(config['DEFAULT']['gvmd_hostname'])
+    gvm_hostname = config['DEFAULT']['gvmd_hostname']
+    gmp_username = config['DEFAULT']['gmp_username']
+    gmp_password = config['DEFAULT']['gmp_password']
 
-    print("Get GVMd version:")
-    get_version(connection)
+    client = gmp_client.GMPClient(gvm_hostname, 9390, gmp_username, gmp_password, certs_path='/certs')
 
-    print("Get GVM tasks:")
-    get_tasks(connection,
-        config['DEFAULT']['gmp_username'], config['DEFAULT']['gmp_password'])
+    # Create a connection
+    client()
+
+    # Get GVMd version
+    client.get_version()
+
+    # Get tasks created on GVMd
+    get_tasks_response = client.get_tasks()
+    for task in get_tasks_response.xpath('task'):
+        print(task.xpath('name/text()'))
+
+    # Get sanners.
+    get_scanners_response = client.get_scanners()
+    for scanner in get_scanners_response.xpath('scanner'):
+        print(scanner.xpath('name/text()'))
+
 
 if __name__ == '__main__':
     main()
