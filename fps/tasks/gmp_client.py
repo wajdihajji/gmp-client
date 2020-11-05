@@ -1,20 +1,23 @@
 """
 GMP client class and functions to be used by the friendly probing suite.
 """
+from functools import wraps
+
 from gvm.connections import TLSConnection
 from gvm.protocols.gmp import Gmp
 from gvm.transforms import EtreeTransform
 from gvm.xml import pretty_print
 
 
-# Decorator for GVM authentication
 def authenticate(func):
+    """Decorator for GVM authentication."""
+    @wraps(func)
     def wrapper(*argv, **kwargs):
         with Gmp(argv[0].tls_connection, transform=EtreeTransform()) as gmp:
+            kwargs['gmp'] = gmp
+
             # Login
             gmp.authenticate(argv[0].gmp_username, argv[0].gmp_password)
-
-            kwargs['gmp'] = gmp
 
             return func(*argv, **kwargs)
     return wrapper
@@ -67,6 +70,7 @@ class GMPClient(object):
         """Returns credentials information as an XML object."""
         return gmp.get_credentials(filter=_filter)
 
+    @authenticate
     def create_credential(self, gmp, name, certs_path='/certs'):
         """
         Creates a `CLIENT_CERTIFICATE` credential.
@@ -85,6 +89,7 @@ class GMPClient(object):
         return gmp.create_credential(
             name=name, credential_type=credential_type, certificate=cert, private_key=private_key)
 
+    @authenticate
     def create_scanner(self, gmp, name, host, credential='remote-scanner', port=9390, certs_path='/certs'):
         """
         Creates a remote OpenVAS scanner connected to GVMd through TLS connection.
@@ -106,6 +111,7 @@ class GMPClient(object):
             name=name, host=host, port=port, scanner_type=scanner_type,
             credential_id=credentials_xml[0].get('id'), ca_pub=ca_pub)
 
+    @authenticate
     def delete_scanner(self, gmp, host, ultimate=False):
         """
         Deletes an OpenVAS scanner.
@@ -122,7 +128,8 @@ class GMPClient(object):
 
         return gmp.delete_scanner(scanner_id=scanners_xml[0].get('id'), ultimate=ultimate)
 
-    def create_target(self, name, hosts, port_range, port_list_id=None):
+    @authenticate
+    def create_target(self, gmp, name, hosts, port_range, port_list_id=None):
         """
         Creates target.
 
@@ -133,7 +140,8 @@ class GMPClient(object):
         """
         return gmp.create_target(name, hosts=hosts, port_range=port_range, port_list_id=port_list_id)
 
-    def create_port_list(self, name, port_range):
+    @authenticate
+    def create_port_list(self, gmp, name, port_range):
         """
         Creates a port list.
 
