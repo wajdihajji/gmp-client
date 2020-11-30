@@ -1,16 +1,16 @@
 """
-GMP client class and functions to be used by the friendly probing suite.
+GMP client class to run operations on GVM daemon.
 """
+import logging
 from functools import wraps
 
 from gvm.connections import TLSConnection
 from gvm.protocols.gmp import Gmp
 from gvm.transforms import EtreeTransform
-from gvm.xml import pretty_print
 
 
 def authenticate(func):
-    """Decorator for GVM authentication."""
+    """Decorator to authenticate against a GVM daemon."""
     @wraps(func)
     def wrapper(*argv, **kwargs):
         with Gmp(argv[0].tls_connection, transform=EtreeTransform()) as gmp:
@@ -25,7 +25,7 @@ def authenticate(func):
 
 class GMPClient(object):
     """
-    Creates a TLS connection to and runs tasks on a remote GVM daemon.
+    GMP Client class to connect to GVM daemon and run operations on.
     """
     def __init__(self, gvm_hostname, gvm_port, gmp_username, gmp_password, certs_path=None):
         self.gvm_hostname = gvm_hostname
@@ -51,94 +51,245 @@ class GMPClient(object):
         """Returns GVMd version."""
         with Gmp(self.tls_connection, transform=EtreeTransform()) as gmp:
             version = gmp.get_version()
+            logging.info('GMP version: %s', version.xpath('version/text()')[0])
 
-            # Prints the XML in beautiful form
-            pretty_print(version)
-
-    @authenticate
-    def get_tasks(self, gmp):
-        """Returns tasks information as an XML object."""
-        return gmp.get_tasks()
+            return version
 
     @authenticate
-    def get_scanners(self, gmp, _filter=None):
-        """Returns scanners information as an XML object."""
-        return gmp.get_scanners(filter=_filter)
+    def get_tasks(self, gmp, *argv, **kwargs):
+        """Returns tasks."""
+        return gmp.get_tasks(*argv, **kwargs).xpath('task')
 
     @authenticate
-    def get_credentials(self, gmp, _filter=None):
-        """Returns credentials information as an XML object."""
-        return gmp.get_credentials(filter=_filter)
+    def get_tasks_by_config(self, gmp, task_config, *argv, **kwargs):
+        """Returns tasks having `task_config`."""
+        tasks = gmp.get_tasks(*argv, **kwargs).xpath('task')
+
+        return [task for task in tasks if task.xpath('config/name/text()')[0] == task_config]
 
     @authenticate
-    def create_credential(self, gmp, name, certs_path='/certs'):
+    def get_report(self, gmp, report_id, *argv, **kwargs):
+        """Returns report having `report_id`."""
+        return gmp.get_report(report_id=report_id, *argv, **kwargs)
+
+    @authenticate
+    def get_scanners(self, gmp, *argv, **kwargs):
+        """Returns scanners."""
+        return gmp.get_scanners(*argv, **kwargs).xpath('scanner')
+
+    @authenticate
+    def get_credentials(self, gmp, *argv, **kwargs):
+        """Returns credentials."""
+        return gmp.get_credentials(*argv, **kwargs).xpath('credential')
+
+    @authenticate
+    def get_port_list_id(self, gmp, name):
+        """Returns ID of port list having `name`."""
+        _port_lists = self.get_port_lists(filter=f'name="{name}"')
+        return _port_lists[0].get('id') if len(_port_lists) > 0 else None
+
+    @authenticate
+    def get_port_lists(self, gmp, *argv, **kwargs):
+        """
+        Returns port lists.
+
+        :return: `get_port_lists`'s result.
+        """
+        return gmp.get_port_lists(*argv, **kwargs).xpath('port_list')
+
+    @authenticate
+    def get_targets(self, gmp, *argv, **kwargs):
+        """
+        Returns targets.
+
+        :return: `get_targets`'s result.
+        """
+        return gmp.get_targets(*argv, **kwargs).xpath('target')
+
+    @authenticate
+    def get_config_id(self, gmp, name):
+        """Returns config ID."""
+        _configs = self.get_configs(filter=f'name="{name}"')
+        return _configs[0].get('id') if len(_configs) > 0 else None
+
+    @authenticate
+    def get_scanner_id(self, gmp, name):
+        """Returns scanner ID."""
+        _scanners = self.get_scanners(filter=f'name="{name}"')
+        return _scanners[0].get('id') if len(_scanners) > 0 else None
+
+    @authenticate
+    def get_target_id(self, gmp, name):
+        """Returns target ID."""
+        _targets = self.get_targets(filter=f'name="{name}"')
+        return _targets[0].get('id') if len(_targets) > 0 else None
+
+    @authenticate
+    def get_task_id(self, gmp, name):
+        """Returns task ID."""
+        _tasks = self.get_tasks(filter=f'name="{name}"')
+        return _tasks[0].get('id') if len(_tasks) > 0 else None
+
+    @authenticate
+    def get_configs(self, gmp, *argv, **kwargs):
+        """Returns scanning configurations."""
+        return gmp.get_configs(*argv, **kwargs).xpath('config')
+
+    @authenticate
+    def create_credential(self, gmp, name, certs_path='/certs', *args, **kwargs):
         """
         Creates a `CLIENT_CERTIFICATE` credential.
 
         :param name: credential name.
         :param certs_path: path where to find cert.pem and key.pem files.
+        :return: `True` if credential exists, otherwise, `gmp.create_credential()`'s result.
         """
+        if len(self.get_credentials(filter=f'name="{name}"')) > 0:
+            logging.info('Credential already exists.')
+            return True
+
         with open(f'{certs_path}/cert.pem', 'r') as reader:
-            cert = reader.read()
+            certificate = reader.read()
+            kwargs['certificate'] = certificate
 
         with open(f'{certs_path}/key.pem', 'r') as reader:
             private_key = reader.read()
+            kwargs['private_key'] = private_key
 
-        credential_type = gmp.types.CredentialType.CLIENT_CERTIFICATE
+        kwargs['name'] = name
+        kwargs['credential_type'] = gmp.types.CredentialType.CLIENT_CERTIFICATE
 
-        return gmp.create_credential(
-            name=name, credential_type=credential_type, certificate=cert, private_key=private_key)
+        return gmp.create_credential(*args, **kwargs)
 
     @authenticate
-    def create_scanner(self, gmp, name, host, credential='remote-scanner', port=9390, certs_path='/certs'):
+    def create_scanner(
+            self, gmp, name, host, credential='remote_scanner', port=9391, certs_path='/certs', **kwargs):
         """
-        Creates a remote OpenVAS scanner connected to GVMd through TLS connection.
+        Creates a scanner.
 
-        :param name: scanner's name.
-        :param host: scanner's hostname.
-        :param credential: CLIENT_CERTIFICATE credential to use in the TLS connection.
-        :param certs_path: path where to find cacert.pem file.
+        :param name: scanner name.
+        :param host: scanner hostname.
+        :param credential: `CLIENT_CERTIFICATE` credential.
+        :param certs_path: cacert.pem file path.
+        :return: `True` if scanner already exists, `False` if missing info, otherwise, `create_scanner`'s result.
         """
-        get_credentials_response = self.get_credentials(gmp, _filter=f'name={credential}')
-        credentials_xml = get_credentials_response.xpath('credential')
+        if self.get_scanner_id(name=name) is not None:
+            logging.info('Scanner %s already exists.', name)
+            return {'status_text': 'Scanner already exists.'}
+
+        if len(self.get_credentials(filter=f'name={credential}')) == 0:
+            logging.warn('Credential %s does not exist.', credential)
+            return False
+
+        credential_id = self.get_credentials(filter=f'name={credential}')[0].get('id')
 
         with open(f'{certs_path}/cacert.pem', 'r') as reader:
             ca_pub = reader.read()
 
-        scanner_type = gmp.types.ScannerType.OPENVAS_SCANNER_TYPE
-
         return gmp.create_scanner(
-            name=name, host=host, port=port, scanner_type=scanner_type,
-            credential_id=credentials_xml[0].get('id'), ca_pub=ca_pub)
+            name=name, host=host, port=port, scanner_type=gmp.types.ScannerType.OPENVAS_SCANNER_TYPE,
+            credential_id=credential_id, ca_pub=ca_pub, **kwargs)
 
     @authenticate
-    def delete_scanner(self, gmp, host, ultimate=False):
+    def update_scanner_used_for(self, gmp, name, used_for):
         """
-        Deletes an OpenVAS scanner.
+        Creates scanner's comment field.
 
-        :param host: hostname of the scanner to delete.
-        :param ultimate: Move to trash of just delete.
+        :param name: scanner name.
+        :param used_for: value of `used_for` attribute.
+        :return: `None` if scanner does not exist, otherwise, `modify_scanner`'s result.
         """
-        get_scanners_response = self.get_scanners(gmp, _filter=f'host={host}')
-        scanners_xml = get_scanners_response.xpath('scanner')
+        scanner_id = self.get_scanner_id(name=name)
+        if scanner_id is None:
+            logging.info('Scanner %s does not exist.', name)
+            return None
 
-        if len(scanners_xml) == 0:
-            print(f'Scanner not found. Host: {host}')
+        return gmp.modify_scanner(scanner_id=scanner_id, comment=f'used_for:{used_for}')
+
+    @authenticate
+    def delete_scanner(self, gmp, name, ultimate=False):
+        """
+        Deletes a scanner.
+
+        :param name: scanner name.
+        :param ultimate: Move to trash or delete permanently.
+        """
+        scanner_id = self.get_scanner_id(name)
+        if scanner_id is None:
+            logging.info('Scanner %s does not exist.', name)
             return True
 
-        return gmp.delete_scanner(scanner_id=scanners_xml[0].get('id'), ultimate=ultimate)
+        return gmp.delete_scanner(scanner_id=scanner_id, ultimate=ultimate)
 
     @authenticate
-    def create_target(self, gmp, name, hosts, port_range, port_list_id=None):
+    def create_target(self, gmp, name, hosts, port_list_name, port_range=None, state=None, **kwargs):
         """
-        Creates target.
+        Creates a target.
+
+        :param name: name.
+        :param hosts: hosts.
+        :param port_list_name: port list name.
+        :param port_range: OPTIONAL. port range.
+        :param state: OPTIONAL. state attribute in the target's comment field.
+        :return: `None` if missing info, otherwise, `create_target`'s result.
+        """
+        target_id = self.get_target_id(name=name)
+        if target_id is not None:
+            logging.info('Target %s already exists.', name)
+            return None
+
+        if len(hosts) == 0:
+            logging.info('No hosts provided to create the target %s.', name)
+            return None
+
+        port_list_id = self.get_port_list_id(name=port_list_name)
+        if port_list_id is None:
+            logging.info('Port list %s does not exist.', port_list_name)
+            return None
+
+        comment = "" if state is None else f'state:{state}'
+
+        return gmp.create_target(
+            name, hosts=hosts, port_range=port_range, port_list_id=port_list_id, comment=comment, **kwargs)
+
+    @authenticate
+    def update_target_state(self, gmp, name, state):
+        """
+        Updates target's state attribute in comment field.
+
+        state=['unassigned', 'assigned', 'scanned']
 
         :param name: target name.
-        :param hosts: hosts of the target.
-        :param port_range: port range of the target.
-        :param port_list_id: port list of the target.
+        :param state: new state.
+        :return: `False` if target does not exist, otherwise `modify_target`s result.
         """
-        return gmp.create_target(name, hosts=hosts, port_range=port_range, port_list_id=port_list_id)
+        target_id = self.get_target_id(name=name)
+        if target_id is None:
+            logging.info('Target %s does not exist.', name)
+            return False
+
+        return gmp.modify_target(target_id=target_id, comment=f'state:{state}')
+
+    @authenticate
+    def create_port_range(self, gmp, port_list_name, start, end, protocol='TCP'):
+        """
+        Creates a port range.
+
+        :param port_list_name: port list name to add the port range to.
+        :param start: port range start.
+        :param end: port range end.
+        :param protocol: OPTIONAL. port range protocol. Default: TCP
+        :return: `False` if no port list, otherwise, `create_port_range`'s result.
+        """
+        port_list_id = self.get_port_list_id(name=port_list_name)
+        if port_list_id is None:
+            logging.info('Port list %s does not exist.', port_list_name)
+            return False
+
+        port_range_type = getattr(gmp.types.PortRangeType, protocol)
+
+        return gmp.create_port_range(
+            port_list_id=port_list_id, start=start, end=end, port_range_type=port_range_type)
 
     @authenticate
     def create_port_list(self, gmp, name, port_range):
@@ -146,6 +297,193 @@ class GMPClient(object):
         Creates a port list.
 
         :param name: port list name.
-        :param port_range: Port list ranges e.g. `"T: 1-1234"` for tcp port 1 - 1234
+        :param port_range: port list ranges e.g. `"T: 1-1234"` for tcp port 1 - 1234
+        :return: `True` if port list already exists, otherwise, `create_port_list`'s result.
         """
+        port_list_id = self.get_port_list_id(name=name)
+        if port_list_id is not None:
+            logging.info('Port list %s already exists.', name)
+            return True
+
         return gmp.create_port_list(name, port_range)
+
+    @authenticate
+    def create_task(self, gmp, name, config_name, target_name, scanner_name, preferences, state, **kwargs):
+        """
+        Creates a task.
+
+        :param name: task name.
+        :param config_name: task configuration.
+        :param target_name: task's target.
+        :param scanner_name: task's scanner.
+        :param preferences: task's preferences.
+        :param state: state attribute in task's comment field.
+        :return: `True` if task already exists, `False` if missing info, `create_task`'s result, otherwise.
+        """
+        task_id = self.get_task_id(name=name)
+        if task_id is not None:
+            logging.info('Task %s already exists.', name)
+            return True
+
+        config_id = self.get_config_id(name=config_name)
+        if config_id is None:
+            logging.info('Config %s does not exist.', config_name)
+            return False
+
+        target_id = self.get_target_id(name=target_name)
+        if target_id is None:
+            logging.info('Target %s does not exist.', target_name)
+            return False
+
+        scanner_id = self.get_scanner_id(name=scanner_name)
+        if scanner_id is None:
+            logging.info('Scanner %s does not exist.', scanner_name)
+            return False
+
+        return gmp.create_task(
+            name=name, config_id=config_id, target_id=target_id, scanner_id=scanner_id,
+            preferences=preferences, comment=f'state:{state}', **kwargs)
+
+    @authenticate
+    def modify_task(self, gmp, name, config_name, target_name, scanner_name, preferences):
+        """
+        Modifies a task.
+
+        :param name: task name.
+        :param config_name: task configuration.
+        :param target_name: task's target.
+        :param scanner_name: task's scanner.
+        :param preferences: task's preferences.
+        :param state: state attribute in task's comment field.
+        :return: `False` if missing info, `modify_task`'s result, otherwise.
+        """
+        task_id = self.get_task_id(name=name)
+        if task_id is None:
+            logging.info('Task %s does not exist.', name)
+            return False
+
+        config_id = self.get_config_id(name=config_name)
+        if config_id is None:
+            logging.info('Config %s does not exist.', config_name)
+            return False
+
+        target_id = self.get_target_id(name=target_name)
+        if target_id is None:
+            logging.info('Target %s does not exist.', target_name)
+            return False
+
+        scanner_id = self.get_scanner_id(name=scanner_name)
+        if scanner_id is None:
+            logging.info('Scanner %s does not exist.', scanner_name)
+            return False
+
+        return gmp.modify_task(
+            task_id=task_id, config_id=config_id,
+            target_id=target_id, scanner_id=scanner_id, preferences=preferences)
+
+    @authenticate
+    def update_task_state(self, gmp, name, state):
+        """
+        Updates state attribute in task's comment field.
+
+        state=['initialised', 'has_target', 'has_scanner', 'started', 'finished', 'failed', 'stopped']
+
+        :param name: task name.
+        :param state: new task name.
+        :return: `False` if task does not exist, `modify_task`'s result otherwise.
+        """
+        task_id = self.get_task_id(name=name)
+        if task_id is None:
+            logging.info('Task %s does not exist.', name)
+            return False
+
+        return gmp.modify_task(task_id=task_id, comment=f'state:{state}')
+
+    @authenticate
+    def update_task_scanner(self, gmp, name, scanner_name):
+        """
+        Updates task's scanner.
+
+        :param name: task name.
+        :param scanner_name: scanner name.
+        :return: `False` if missing info, `modify_task`'s result otherwise.
+        """
+        task_id = self.get_task_id(name=name)
+        if task_id is None:
+            logging.info('Task %s does not exist.', name)
+            return False
+
+        scanner_id = self.get_scanner_id(name=scanner_name)
+        if scanner_id is None:
+            logging.info('Scanner %s does not exist.', scanner_name)
+            return False
+
+        return gmp.modify_task(task_id=task_id, scanner_id=scanner_id)
+
+    @authenticate
+    def update_task_target(self, gmp, name, target_name):
+        """
+        Updates task's target.
+
+        :param name: task name.
+        :param scanner_name: scanner name.
+        :return: `False` if missing info, `modify_task`'s result otherwise.
+        """
+        task_id = self.get_task_id(name=name)
+        if task_id is None:
+            logging.info('Task %s does not exist.', name)
+            return False
+
+        target_id = self.get_target_id(name=target_name)
+        if target_id is None:
+            logging.info('Target %s does not exist.', target_name)
+            return False
+
+        return gmp.modify_task(task_id=task_id, target_id=target_id)
+
+    @authenticate
+    def delete_task(self, gmp, name, ultimate=False):
+        """
+        Deletes a task.
+
+        :param name: task name.
+        :param ultimate: Move to trash or delete permanently.
+        :return: `True` if task does not exist, `delete_task`'s result otherwise.
+        """
+        task_id = self.get_task_id(name=name)
+        if task_id is None:
+            logging.info('Task %s does not exist.', name)
+            return False
+
+        return gmp.delete_task(task_id=task_id, ultimate=ultimate)
+
+    @authenticate
+    def delete_target(self, gmp, name, ultimate=False):
+        """
+        Deletes a target.
+
+        :param name: target name.
+        :param ultimate: Move to trash or delete permanently.
+        :return: `True` if target does not exist, `delete_target`'s result otherwise.
+        """
+        target_id = self.get_target_id(name=name)
+        if target_id is None:
+            logging.info('Target %s does not exist.', name)
+            return False
+
+        return gmp.delete_target(target_id=target_id, ultimate=ultimate)
+
+    @authenticate
+    def start_task(self, gmp, name):
+        """
+        Starts a task.
+
+        :param name: task name.
+        :return: `False` if task does not exist, `start_task`'s result otherwise.
+        """
+        task_id = self.get_task_id(name=name)
+        if task_id is None:
+            logging.info('Task %s does not exist.', name)
+            return False
+
+        return gmp.start_task(task_id=task_id)
