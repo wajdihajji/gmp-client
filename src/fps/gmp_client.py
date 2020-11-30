@@ -257,8 +257,6 @@ class GMPClient(object):
         """
         Updates target's state attribute in comment field.
 
-        state=['unassigned', 'assigned', 'scanned']
-
         :param name: target name.
         :param state: new state.
         :return: `False` if target does not exist, otherwise `modify_target`s result.
@@ -385,8 +383,6 @@ class GMPClient(object):
     def update_task_state(self, gmp, name, state):
         """
         Updates state attribute in task's comment field.
-
-        state=['initialised', 'has_target', 'has_scanner', 'started', 'finished', 'failed', 'stopped']
 
         :param name: task name.
         :param state: new task name.
