@@ -56,16 +56,14 @@ class GMPClient(object):
             return version
 
     @authenticate
-    def get_tasks(self, gmp, *argv, **kwargs):
+    def get_tasks(self, gmp, task_config=None, *argv, **kwargs):
         """Returns tasks."""
-        return gmp.get_tasks(*argv, **kwargs).xpath('task')
-
-    @authenticate
-    def get_tasks_by_config(self, gmp, task_config, *argv, **kwargs):
-        """Returns tasks having `task_config`."""
         tasks = gmp.get_tasks(*argv, **kwargs).xpath('task')
 
-        return [task for task in tasks if task.xpath('config/name/text()')[0] == task_config]
+        if task_config is not None:
+            return [task for task in tasks if task.xpath('config/name/text()')[0] == task_config]
+
+        return tasks
 
     @authenticate
     def get_report(self, gmp, report_id, *argv, **kwargs):
@@ -212,7 +210,7 @@ class GMPClient(object):
         Deletes a scanner.
 
         :param name: scanner name.
-        :param ultimate: Move to trash or delete permanently.
+        :param ultimate: move to trash or delete permanently.
         """
         scanner_id = self.get_scanner_id(name)
         if scanner_id is None:
@@ -229,8 +227,8 @@ class GMPClient(object):
         :param name: name.
         :param hosts: hosts.
         :param port_list_name: port list name.
-        :param port_range: OPTIONAL. port range.
-        :param state: OPTIONAL. state attribute in the target's comment field.
+        :param port_range:port range.
+        :param state: state attribute in the target's comment field.
         :return: `None` if missing info, otherwise, `create_target`'s result.
         """
         target_id = self.get_target_id(name=name)
@@ -276,7 +274,7 @@ class GMPClient(object):
         :param port_list_name: port list name to add the port range to.
         :param start: port range start.
         :param end: port range end.
-        :param protocol: OPTIONAL. port range protocol. Default: TCP
+        :param protocol: port range protocol. Default: TCP
         :return: `False` if no port list, otherwise, `create_port_range`'s result.
         """
         port_list_id = self.get_port_list_id(name=port_list_name)
