@@ -66,10 +66,6 @@ if __name__ == '__main__':
     schedule.every(15).seconds.do(
         job_run_scan, gmp_client=gmp_client, db_connection=db_connection)
 
-    # while True:
-    #     job_run_discovery(gmp_client, db_connection)
-    #     job_run_scan(gmp_client, db_connection)
-    #     time.sleep(10)
     while True:
         schedule.run_pending()
         time.sleep(1)
