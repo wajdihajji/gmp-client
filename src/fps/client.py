@@ -10,7 +10,7 @@ from gvm.protocols.gmp import Gmp
 from gvm.transforms import EtreeTransform
 
 config = configparser.ConfigParser()
-config.read('config.ini')
+config.read(['config.ini', 'secrets.ini'])
 
 
 def authenticate(func):
