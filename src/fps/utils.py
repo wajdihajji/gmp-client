@@ -59,7 +59,7 @@ def populate_hosts_table(conn, permutation_elts):
         logging.info('Creating %s entries in table hosts...', len(hosts))
         cur.execute('''create table if not exists hosts
                     (date text not null, ip_address text primary key, netmask text,
-                    checked_if_up integer default 0, seen_up integer default 0,
+                    selected_for_discovery integer default 0, seen_up integer default 0,
                     selected_for_scan integer default 0, scanned integer default 0)''')
 
         for host in hosts:
@@ -71,7 +71,7 @@ def populate_hosts_table(conn, permutation_elts):
 def insert_host(conn, host):
     """Creates a new host."""
     try:
-        sql = ''' INSERT INTO hosts(date, ip_address, netmask, checked_if_up, seen_up, selected_for_scan, scanned)
+        sql = ''' INSERT INTO hosts(date, ip_address, netmask, selected_for_discovery, seen_up, selected_for_scan, scanned)
                 VALUES(?, ?, ?, ?, ?, ?, ?) '''
         cur = conn.cursor()
         cur.execute(sql, host)
@@ -95,11 +95,24 @@ def update_host_attribute(conn, attribute, value, host_ip_address, _date=date.to
     return cur.lastrowid
 
 
-def get_hosts(conn, checked_if_up, seen_up, selected_for_scan, scanned, _date=date.today(), num_records=None):
+def initialise_host_attribute(conn, attribute, value, _date=date.today()):
+    """Initialises `attribute` to `value`."""
+    try:
+        sql = f'update hosts set {attribute} = ? where date = ?'
+        cur = conn.cursor()
+        cur.execute(sql, (value, _date))
+        conn.commit()
+    except sqlite3.Error as error:
+        logging.error(error)
+
+    return cur.lastrowid
+
+
+def get_hosts(conn, selected_for_discovery, seen_up, selected_for_scan, scanned, _date=date.today(), num_records=None):
     """Queries IP addresses in hosts table where `attribute` equals `value`."""
     try:
         sql = (f'select ip_address from hosts '
-               f'where checked_if_up in ({",".join(str(val) for val in checked_if_up)}) '
+               f'where selected_for_discovery in ({",".join(str(val) for val in selected_for_discovery)}) '
                f'and seen_up in ({",".join(str(val) for val in seen_up)}) '
                f'and selected_for_scan in ({",".join(str(val) for val in selected_for_scan)}) '
                f'and scanned in ({",".join(str(val) for val in scanned)}) '
@@ -112,17 +125,17 @@ def get_hosts(conn, checked_if_up, seen_up, selected_for_scan, scanned, _date=da
 
     rows = cur.fetchall()
 
-    logging.info('get_hosts(checked_if_up=%s, seen_up=%s, selected_for_scan=%s, scanned=%s) returns %s rows',
-                 checked_if_up, seen_up, selected_for_scan, scanned, len(rows))
+    logging.info('get_hosts(selected_for_discovery=%s, seen_up=%s, selected_for_scan=%s, scanned=%s) returns %s rows',
+                 selected_for_discovery, seen_up, selected_for_scan, scanned, len(rows))
 
     return [row[0] for row in rows]
 
 
-def get_hosts_count(conn, checked_if_up, seen_up, selected_for_scan, scanned, _date=date.today()):
+def get_hosts_count(conn, selected_for_discovery, seen_up, selected_for_scan, scanned, _date=date.today()):
     """Returns hosts count."""
     try:
         sql = (f'select count(*) from hosts '
-               f'where checked_if_up in ({",".join(str(val) for val in checked_if_up)}) '
+               f'where selected_for_discovery in ({",".join(str(val) for val in selected_for_discovery)}) '
                f'and seen_up in ({",".join(str(val) for val in seen_up)}) '
                f'and selected_for_scan in ({",".join(str(val) for val in selected_for_scan)}) '
                f'and scanned in ({",".join(str(val) for val in scanned)}) '

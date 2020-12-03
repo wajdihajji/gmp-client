@@ -6,8 +6,8 @@ import logging
 import uuid
 
 from fps.client import GMPClient
-from fps.utils import (get_key_by_value, update_discovered_hosts,
-                       update_host_attribute)
+from fps.utils import (get_key_by_value, initialise_host_attribute,
+                       update_discovered_hosts, update_host_attribute)
 
 config = configparser.ConfigParser()
 config.read('config.ini')
@@ -86,14 +86,20 @@ def delete_tasks(
     :param task_config: the tasks having `task_config` will be deleted.
     :param states: the tasks in `states` will be deleted.
     :param ultimate: move to trash or delete permanently.
+    :return: list of deleted tasks.
     """
     state_filter = create_comment('state', states)
 
     _filter = f'rows=-1 {state_filter}' if task_name is None else f'rows=-1 name={task_name} and {state_filter}'
 
+    deleted_tasks = []
     for task in client.get_tasks(task_config=task_config, filter=_filter):
-        result = client.delete_task(name=task.xpath('name/text()')[0], ultimate=ultimate)
-        logging.info('Deleted task %s: %s', task.xpath('name/text()')[0], result.get('status_text'))
+        _task_name = task.xpath('name/text()')[0]
+        result = client.delete_task(name=_task_name, ultimate=ultimate)
+        logging.info('Deleted task %s: %s', _task_name, result.get('status_text'))
+        deleted_tasks.append(_task_name)
+
+    return deleted_tasks
 
 
 def delete_targets(client: GMPClient, target_name=None, states=['scanned'], ultimate=True):
@@ -108,12 +114,17 @@ def delete_targets(client: GMPClient, target_name=None, states=['scanned'], ulti
 
     _filter = f'rows=-1 {state_filter}' if target_name is None else f'rows=-1 name={target_name} and {state_filter}'
 
+    deleted_targets = []
     for target in client.get_targets(filter=_filter):
+        _target_name = target.xpath('name/text()')[0]
         if target.xpath('in_use/text()')[0] == "0":
-            result = client.delete_target(name=target.xpath('name/text()')[0], ultimate=ultimate)
-            logging.info('Deleted target %s: %s', target.xpath('name/text()')[0], result.get('status_text'))
+            result = client.delete_target(name=_target_name, ultimate=ultimate)
+            logging.info('Deleted target %s: %s', _target_name, result.get('status_text'))
         else:
-            logging.info('Target %s is in use', target.xpath('name/text()')[0])
+            logging.info('Target %s is in use', _target_name)
+        deleted_targets.append(_target_name)
+
+    return deleted_targets
 
 
 def create_scanners(
@@ -149,7 +160,8 @@ def delete_scanners(
 
 def assign_targets(
         client: GMPClient,  target_name=None, task_name=None, task_config=None,
-        target_states=['unassigned'], task_states=['initialised']):
+        target_states=['unassigned'], task_states=['initialised'],
+        next_target_state='assigned', next_task_state='has_target'):
     """
     Assign targets to tasks.
 
@@ -158,6 +170,8 @@ def assign_targets(
     :param task_config: tasks with `task_config` can accept targets.
     :param target_states: targets in `target_states` will be assigned.
     :param task_states: tasks in `task_states` can accept targets.
+    :param next_target_state: Next target state.
+    :param next_task_state: Next task state.
     """
     target_state_filter = create_comment('state', target_states)
     task_state_filter = create_comment('state', task_states)
@@ -176,15 +190,15 @@ def assign_targets(
             break
         client.update_task_target(
             name=available_task.xpath('name/text()')[0], target_name=target_name)
-        client.update_task_state(name=available_task.xpath('name/text()')[0], state="has_target")
-        client.update_target_state(name=target_name, state="assigned")
+        client.update_task_state(name=available_task.xpath('name/text()')[0], state=next_task_state)
+        client.update_target_state(name=target_name, state=next_target_state)
         tasks.remove(available_task)
         logging.info('Target %s assigned to task %s', target_name, available_task.xpath('name/text()')[0])
 
 
 def assign_tasks(
         client: GMPClient, task_name=None, task_config=None, scanner_name=None,
-        task_states=['has_target'], scanner_used_for=['scan']):
+        task_states=['has_target'], scanner_used_for=['scan'], next_task_state='has_scanner'):
     """
     Assign tasks to scanners.
 
@@ -195,6 +209,7 @@ def assign_tasks(
     :param scanner_name: scanners with name `scanner_name` will be added to scanners' filter.
     :param task_states: tasks in `task_states` will be assigned to scanners.
     :param scanner_used_for: scanners having `used_for` set to `scanner_used_for` can accept tasks.
+    :param next_task_state: Next task state.
     :return: `None` if no scanners available.
     """
     active_tasks_per_scanner_dict = active_tasks_per_scanner(client, scanner_name, scanner_used_for)
@@ -215,10 +230,12 @@ def assign_tasks(
         active_tasks_per_scanner_dict[scanner_name] += 1
         logging.info('Task %s will run on the scanner %s', task_name, scanner_name)
         client.update_task_scanner(name=task_name, scanner_name=scanner_name)
-        client.update_task_state(name=task_name, state='has_scanner')
+        client.update_task_state(name=task_name, state=next_task_state)
 
 
-def start_tasks(client: GMPClient, task_name=None, task_config=None, states=['has_scanner']):
+def start_tasks(
+        client: GMPClient, task_name=None, task_config=None,
+        states=['has_scanner'], next_task_state='started'):
     """
     Starts a set of tasks.
 
@@ -234,10 +251,12 @@ def start_tasks(client: GMPClient, task_name=None, task_config=None, states=['ha
         task_name = task.xpath('name/text()')[0]
         result = client.start_task(name=task_name)
         logging.info('Starting task %s: %s', task_name, result.get('status_text'))
-        client.update_task_state(name=task_name, state='started')
+        client.update_task_state(name=task_name, state=next_task_state)
 
 
-def get_scanned_hosts(client: GMPClient, task_name=None, task_config=None, task_states=['finished']):
+def get_scanned_hosts(
+        client: GMPClient, task_name=None, task_config=None, task_states=['finished'],
+        next_task_state='obsolete', next_target_state='scanned'):
     """
     Returns scanned hosts.
 
@@ -257,8 +276,8 @@ def get_scanned_hosts(client: GMPClient, task_name=None, task_config=None, task_
         task_report_id = task.xpath('last_report/report')[0].get('id')
         task_report = client.get_report(report_id=task_report_id, details=True)
 
-        client.update_task_state(name=task_name, state='obsolete')
-        client.update_target_state(name=task_target, state='scanned')
+        client.update_task_state(name=task_name, state=next_task_state)
+        client.update_target_state(name=task_target, state=next_target_state)
 
         scanned_hosts.extend(task_report[0].xpath('report/host/ip/text()'))
         logging.info('Scanned hosts by task %s: %s', task.xpath('name/text()')[0], scanned_hosts)
@@ -295,7 +314,9 @@ def active_tasks_per_scanner(client: GMPClient, scanner_name=None, scanner_used_
     return tasks_per_scanner_dict
 
 
-def check_task_completion(client: GMPClient, task_name=None, task_config=None, states=['started']):
+def check_task_completion(
+        client: GMPClient, task_name=None, task_config=None, states=['started'],
+        task_finished_state='finished', task_failed_state='failed', task_stopped_state='stopped'):
     """
     Checks tasks completion status.
 
@@ -316,13 +337,13 @@ def check_task_completion(client: GMPClient, task_name=None, task_config=None, s
             last_report_severity = task.xpath('last_report/report/severity/text()')[0]
             last_report_id = task.xpath('last_report/report')[0].get('id')
             if float(last_report_severity) >= 0.0 or float(last_report_severity) in [-1, -99.0]:
-                state = 'finished'
+                state = task_finished_state
             else:
-                state = 'failed'
+                state = task_failed_state
                 last_report = client.get_report(report_id=last_report_id, details=True)
                 error = last_report[0].xpath('report/errors/error/description/text()')[0]
         elif task_status == 'Stopped':
-            state = 'stopped'
+            state = task_stopped_state
 
         if state is not None:
             client.update_task_state(name=task_name, state=state)
@@ -387,20 +408,31 @@ def run_discovery(client: GMPClient, db_conn, hosts):
                    'preferences': {'max_checks': max_checks, 'max_hosts': max_hosts}}
 
     result = client.create_target(
-        name=discovery_target, hosts=hosts, port_list_name=port_list, state='assigned')
+        name=discovery_target, hosts=hosts, port_list_name=port_list, state='d/assigned')
 
     # If target has been created successfully
     if result.get('status') == '201':
-        client.create_task(name=discovery_task, state='has_scanner', **task_config)
-        start_tasks(client, task_name=discovery_task)
+        client.create_task(name=discovery_task, state='d/has_scanner', **task_config)
         for host in hosts:
-            update_host_attribute(db_conn, 'checked_if_up', 1, host)
+            update_host_attribute(db_conn, 'selected_for_discovery', 1, host)
 
-    check_task_completion(client, task_name=discovery_task)
-    discovered_hosts = get_scanned_hosts(client, task_name=discovery_task)
+    start_tasks(client, task_name=discovery_task, states=['d/has_scanner'], next_task_state='d/started')
+
+    check_task_completion(
+        client, task_name=discovery_task, states=['d/started'],
+        task_finished_state='d/finished', task_failed_state='d/failed', task_stopped_state='d/stopped')
+
+    discovered_hosts = get_scanned_hosts(
+        client, task_name=discovery_task, task_states=['d/finished'],
+        next_task_state='d/obsolete', next_target_state='d/scanned')
+
     update_discovered_hosts(db_conn, discovered_hosts)
-    delete_tasks(client, task_name=discovery_task, ultimate=True)
-    delete_targets(client, target_name=discovery_target)
+    deleted_tasks = delete_tasks(client, task_name=discovery_task, ultimate=True, states=['d/obsolete'])
+    deleted_targets = delete_targets(client, target_name=discovery_target, states=['d/scanned'])
+
+    # Initialise selected_for_discovery attribute to 0 to declare the end of a discovery
+    if discovery_task in deleted_tasks and discovery_target in deleted_targets:
+        initialise_host_attribute(db_conn, 'selected_for_discovery', 0)
 
 
 def run_scan(client: GMPClient, db_conn, hosts):
@@ -419,12 +451,11 @@ def run_scan(client: GMPClient, db_conn, hosts):
                            'preferences': {'max_checks': max_checks, 'max_hosts': max_hosts}}
 
     targets = create_targets(client, num_hosts_per_target, hosts, port_list)
+
+    for host in hosts:
+        update_host_attribute(db_conn, 'selected_for_scan', 1, host)
+
     create_tasks(client, len(targets), **default_task_config)
-
-    if len(targets) > 0:
-        for host in hosts:
-            update_host_attribute(db_conn, 'selected_for_scan', 1, host)
-
     assign_targets(client)
     assign_tasks(client)
     start_tasks(client)
