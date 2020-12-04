@@ -10,7 +10,7 @@ import schedule
 
 from fps.client import GMPClient
 from fps.tasks import (initialise_discovery, initialise_scan, run_discovery,
-                       run_scan)
+                       run_scan, update_host_attribute)
 from fps.utils import create_db_connection, get_hosts, populate_hosts_table
 
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -50,6 +50,8 @@ def job_run_scan(gmp_client, db_connection):
     """Runs scan."""
     # Get the hosts that have been seen up, not selected for scan and not yet scanned.
     sub_hosts = get_hosts(db_connection, [0, 1], [1], [0], [0], num_records=1024)
+    for host in sub_hosts:
+        update_host_attribute(db_connection, 'selected_for_scan', 1, host)
     run_scan(gmp_client, db_connection, sub_hosts)
 
 

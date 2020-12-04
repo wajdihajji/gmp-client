@@ -451,10 +451,6 @@ def run_scan(client: GMPClient, db_conn, hosts):
                            'preferences': {'max_checks': max_checks, 'max_hosts': max_hosts}}
 
     targets = create_targets(client, num_hosts_per_target, hosts, port_list)
-
-    for host in hosts:
-        update_host_attribute(db_conn, 'selected_for_scan', 1, host)
-
     create_tasks(client, len(targets), **default_task_config)
     assign_targets(client)
     assign_tasks(client)
