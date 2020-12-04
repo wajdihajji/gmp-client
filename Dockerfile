@@ -15,4 +15,4 @@ RUN useradd -m gvm
 # Bundle app source
 COPY . /usr/src/app
 
-CMD python fps
+CMD ["python", "-u", "src"]
