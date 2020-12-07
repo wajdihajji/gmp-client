@@ -129,3 +129,6 @@ dmypy.json
 
 # config file containing GVM credentials
 secrets.ini
+
+# openvas certs
+certs
