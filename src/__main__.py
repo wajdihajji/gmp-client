@@ -30,10 +30,10 @@ def with_logging(func):
     return wrapper
 
 
-def job_init(gmp_client):
-    """Runs scan and discovery initialisation."""
-    initialise_scan(gmp_client)
-    initialise_discovery(gmp_client)
+@with_logging
+def job_populate_hosts_table(db_connection):
+    """Loads the host files in ./data into hosts SQLite table."""
+    populate_hosts_table(db_connection)
 
 
 @with_logging
@@ -58,14 +58,23 @@ def job_run_scan(gmp_client, db_connection):
 if __name__ == '__main__':
     gmp_client = GMPClient()
     db_connection = create_db_connection()
-    populate_hosts_table(db_connection, permutation_elts=4)
+    populate_hosts_table(db_connection)
+    initialise_scan(gmp_client)
+    initialise_discovery(gmp_client)
 
-    job_init(gmp_client)
+    # Run job_populate_hosts_table every day at 00:01
+    schedule.every().day.at("00:01").do(
+        job_populate_hosts_table, db_connection=db_connection)
 
-    # The following schedule simply means run job_run_discovery then job_run_scan and do that infinitely.
-    schedule.every(15).seconds.do(
+    discovery_freq = config.getint('DISCOVERY', 'frequency')
+    scan_freq = config.getint('SCAN', 'frequency')
+
+    # Run job_run_discovery every `discovery_freq` minutes
+    schedule.every(discovery_freq).minutes.do(
         job_run_discovery, gmp_client=gmp_client, db_connection=db_connection)
-    schedule.every(15).seconds.do(
+
+    # Run job_run_scan every `scan_freq` minutes
+    schedule.every(scan_freq).minutes.do(
         job_run_scan, gmp_client=gmp_client, db_connection=db_connection)
 
     while True:

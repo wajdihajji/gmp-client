@@ -45,18 +45,25 @@ def create_db_connection(db_file=config['DB']['sqlite_file']):
     return conn
 
 
-def populate_hosts_table(conn, permutation_elts):
-    """Initiliase hosts table with random IP addresses."""
-    today = date.today()
-    hosts_ips = generate_random_ips(permutation_elts)
-    hosts = [(today, ip, '', 0, 0, 0, 0) for ip in hosts_ips]
+def populate_hosts_table(conn, hosts_file=date.today(), permutation_elts=None):
+    """Initiliase hosts table with hosts in `hosts_file`
+       or generated random IP addresses for testing"""
+    scan_date = None
+    if permutation_elts is not None:
+        scan_date = date.today()
+        hosts_ips = generate_random_ips(permutation_elts)
+        hosts = [(scan_date, ip, '', 0, 0, 0, 0) for ip in hosts_ips]
+    else:
+        scan_date = hosts_file
+        hosts_file_full_path = f"{config['DB']['hosts_files_dir']}/{hosts_file}"
+        with open(hosts_file_full_path, 'r') as reader:
+            hosts_ips = reader.read().splitlines()
+        hosts = [(scan_date, ip, '', 0, 0, 0, 0) for ip in hosts_ips]
 
     with conn:
         cur = conn.cursor()
-        logging.info('Drop table hosts...')
-        cur.execute('drop table if exists hosts')
 
-        logging.info('Creating %s entries in table hosts...', len(hosts))
+        logging.info('Creating %s entries in table hosts to be scanned on %s...', len(hosts), scan_date)
         cur.execute('''create table if not exists hosts
                     (date text not null, ip_address text primary key, netmask text,
                     selected_for_discovery integer default 0, seen_up integer default 0,
