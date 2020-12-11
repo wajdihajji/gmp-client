@@ -19,6 +19,8 @@ gmp_password = bar
 
 The list of hosts to scan can be provided as a file under the directory [data/](./data). The filename must be in the format `YYYY-MM-DD` and should indicate the date on which the hosts would be scanned. For instance, the hosts in the file [data/2020-12-18](./data/2020-12-07) would be scanned on 2020-12-18.
 
-## Development
-
-## Deployment
+## Development / Deployment (WIP)
+To build and run the client docker image, set the `networks` in [docker-compose.yml](./docker-compose.yml) to GVM daemon's.
+```bash
+docker-compose -f docker-compose.yml up -d
+```
