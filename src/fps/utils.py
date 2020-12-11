@@ -56,9 +56,13 @@ def populate_hosts_table(conn, hosts_file=date.today(), permutation_elts=None):
     else:
         scan_date = hosts_file
         hosts_file_full_path = f"{config['DB']['hosts_files_dir']}/{hosts_file}"
-        with open(hosts_file_full_path, 'r') as reader:
-            hosts_ips = reader.read().splitlines()
-        hosts = [(scan_date, ip, '', 0, 0, 0, 0) for ip in hosts_ips]
+        try:
+            with open(hosts_file_full_path, 'r') as reader:
+                hosts_ips = reader.read().splitlines()
+            hosts = [(scan_date, ip, '', 0, 0, 0, 0) for ip in hosts_ips]
+        except FileNotFoundError:
+            logging.error('File %s does not exist', hosts_file_full_path)
+            hosts = []
 
     with conn:
         cur = conn.cursor()
