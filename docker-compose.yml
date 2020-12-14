@@ -10,6 +10,6 @@ services:
       - gvm-network
 
 networks:
-  # So gmp-client can access the GVM daemon accessible in this network.
+  # GVM daemon should be accessible in this network
   gvm-network:
     external: true
