@@ -41,7 +41,8 @@ def job_run_discovery(gmp_client, db_connection):
     """Runs host discovery."""
     # Get the hosts that have not been selected_for discovery or seen up,
     # not selected for scan and not yet scanned.
-    sub_hosts = get_hosts(db_connection, [0], [0], [0], [0], num_records=1024)
+    sub_hosts = get_hosts(
+        db_connection, [0], [0], [0], [0], num_records=config.getint('DISCOVERY', 'max_num_hosts'))
     run_discovery(gmp_client, db_connection, sub_hosts)
 
 
@@ -49,7 +50,8 @@ def job_run_discovery(gmp_client, db_connection):
 def job_run_scan(gmp_client, db_connection):
     """Runs scan."""
     # Get the hosts that have been seen up, not selected for scan and not yet scanned.
-    sub_hosts = get_hosts(db_connection, [0, 1], [1], [0], [0], num_records=1024)
+    sub_hosts = get_hosts(
+        db_connection, [0, 1], [1], [0], [0], num_records=config.getint('SCAN', 'max_num_hosts'))
     for host in sub_hosts:
         update_host_attribute(db_connection, 'selected_for_scan', 1, host)
     run_scan(gmp_client, db_connection, sub_hosts)
