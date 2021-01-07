@@ -460,21 +460,3 @@ def run_scan(client: GMPClient, db_conn, hosts):
     update_discovered_hosts(db_conn, scanned_hosts, False)
     delete_tasks(client, ultimate=True)
     delete_targets(client)
-
-
-# def create_dataset(client: GMPClient):
-#     """Creates targets and tasks for a scanning cycle."""
-#     default_port_list = 'default_port_list'
-#     default_target = 'default_target'
-#     default_target_hosts = ['8.8.8.8']
-#     default_config = 'Host Discovery'
-#     default_scanner = 'OpenVAS Default'
-#     default_port_range = 'T: 1-1234'
-#     inital_task_config = {'config_name': default_config, 'target_name': default_target,
-#                           'scanner_name': default_scanner, 'preferences':  {'max_checks': 10, 'max_hosts': 100}}
-
-#     client.create_port_list(name=default_port_list, port_range=default_port_range)
-#     client.create_target(name=default_target, hosts=default_target_hosts, port_list_name=default_port_list)
-#     hosts = generate_random_ips(5)
-#     targets = create_targets(client, 12, hosts, default_port_list)
-#     create_tasks(client, len(targets), **inital_task_config)

@@ -32,14 +32,14 @@ def with_logging(func):
 
 @with_logging
 def job_populate_hosts_table(db_connection):
-    """Loads the host files in ./data into hosts SQLite table."""
+    """Loads the host files in `./data` into the SQLite table `hosts`."""
     populate_hosts_table(db_connection)
 
 
 @with_logging
 def job_run_discovery(gmp_client, db_connection):
     """Runs host discovery."""
-    # Get the hosts that have not been selected_for discovery or seen up,
+    # Get the hosts that have not been selected for discovery or seen up,
     # not selected for scan and not yet scanned.
     sub_hosts = get_hosts(
         db_connection, [0], [0], [0], [0], num_records=config.getint('DISCOVERY', 'max_num_hosts'))
