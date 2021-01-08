@@ -7,6 +7,7 @@ Utils functions to:
 import configparser
 import itertools
 import logging
+import random
 import sqlite3
 from datetime import date
 
@@ -52,14 +53,15 @@ def populate_hosts_table(conn, hosts_file=date.today(), permutation_elts=None):
     if permutation_elts is not None:
         scan_date = date.today()
         hosts_ips = generate_random_ips(permutation_elts)
-        hosts = [(scan_date, ip, '', 0, 0, 0, 0) for ip in hosts_ips]
+        hosts = [(scan_date, ip, '', 0, 0, 0, 0, random.randint(1, 3)) for ip in hosts_ips]
     else:
         scan_date = hosts_file
         hosts_file_full_path = f"{config['DB']['hosts_files_dir']}/{hosts_file}"
         try:
             with open(hosts_file_full_path, 'r') as reader:
                 hosts_ips = reader.read().splitlines()
-            hosts = [(scan_date, ip, '', 0, 0, 0, 0) for ip in hosts_ips]
+            # The scan_priority field here should be provided in the host file
+            hosts = [(scan_date, ip, '', 0, 0, 0, 0, random.randint(1, 3)) for ip in hosts_ips]
         except FileNotFoundError:
             logging.error('File %s does not exist', hosts_file_full_path)
             hosts = []
@@ -71,7 +73,8 @@ def populate_hosts_table(conn, hosts_file=date.today(), permutation_elts=None):
         cur.execute('''create table if not exists hosts
                     (date text not null, ip_address text primary key, netmask text,
                     selected_for_discovery integer default 0, seen_up integer default 0,
-                    selected_for_scan integer default 0, scanned integer default 0)''')
+                    selected_for_scan integer default 0, scanned integer default 0,
+                    scan_priority integer default 3)''')
 
         for host in hosts:
             insert_host(conn, host)
@@ -82,8 +85,10 @@ def populate_hosts_table(conn, hosts_file=date.today(), permutation_elts=None):
 def insert_host(conn, host):
     """Creates a new host."""
     try:
-        sql = ''' INSERT INTO hosts(date, ip_address, netmask, selected_for_discovery, seen_up, selected_for_scan, scanned)
-                VALUES(?, ?, ?, ?, ?, ?, ?) '''
+        sql = ''' INSERT INTO hosts(
+                  date, ip_address, netmask, selected_for_discovery,
+                  seen_up, selected_for_scan, scanned, scan_priority)
+                VALUES(?, ?, ?, ?, ?, ?, ?, ?) '''
         cur = conn.cursor()
         cur.execute(sql, host)
         conn.commit()
@@ -120,14 +125,15 @@ def initialise_host_attribute(conn, attribute, value, _date=date.today()):
 
 
 def get_hosts(conn, selected_for_discovery, seen_up, selected_for_scan, scanned, _date=date.today(), num_records=None):
-    """Queries IP addresses in hosts table where `attribute` equals `value`."""
+    """Returns the hosts where `attribute` equals `value` and having highest scan_priority."""
     try:
-        sql = (f'select ip_address from hosts '
+        sql = (f'select ip_address, scan_priority from hosts '
                f'where selected_for_discovery in ({",".join(str(val) for val in selected_for_discovery)}) '
                f'and seen_up in ({",".join(str(val) for val in seen_up)}) '
                f'and selected_for_scan in ({",".join(str(val) for val in selected_for_scan)}) '
                f'and scanned in ({",".join(str(val) for val in scanned)}) '
                f'and date = "{_date}"'
+               f'order by scan_priority'
                f'{"" if num_records is None else " limit " + str(num_records)}')
         cur = conn.cursor()
         cur.execute(sql)
@@ -136,13 +142,16 @@ def get_hosts(conn, selected_for_discovery, seen_up, selected_for_scan, scanned,
 
     rows = cur.fetchall()
 
+    hosts_high_priority = [row[0] for row in rows if row[1] == rows[0][1]]
+
     logging.info('get_hosts(selected_for_discovery=%s, seen_up=%s, selected_for_scan=%s, scanned=%s) returns %s rows',
-                 selected_for_discovery, seen_up, selected_for_scan, scanned, len(rows))
+                 selected_for_discovery, seen_up, selected_for_scan, scanned, len(hosts_high_priority))
 
-    return [row[0] for row in rows]
+    return hosts_high_priority
 
 
-def get_hosts_count(conn, selected_for_discovery, seen_up, selected_for_scan, scanned, _date=date.today()):
+def get_hosts_count(
+        conn, selected_for_discovery, seen_up, selected_for_scan, scanned, scan_priority=[1, 2, 3], _date=date.today()):
     """Returns hosts count."""
     try:
         sql = (f'select count(*) from hosts '
@@ -150,6 +159,7 @@ def get_hosts_count(conn, selected_for_discovery, seen_up, selected_for_scan, sc
                f'and seen_up in ({",".join(str(val) for val in seen_up)}) '
                f'and selected_for_scan in ({",".join(str(val) for val in selected_for_scan)}) '
                f'and scanned in ({",".join(str(val) for val in scanned)}) '
+               f'and scan_priority in ({",".join(str(val) for val in scan_priority)}) '
                f'and date = "{_date}"')
         cur = conn.cursor()
         cur.execute(sql)
