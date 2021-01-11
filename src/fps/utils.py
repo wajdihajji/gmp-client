@@ -46,25 +46,22 @@ def create_db_connection(db_file=config['DB']['sqlite_file']):
     return conn
 
 
-def populate_hosts_table(conn, hosts_file=date.today(), permutation_elts=None):
+def populate_hosts_table(conn, scan_date=date.today(), hosts_file=f'{date.today()}.csv', permutation_elts=None):
     """Initiliase hosts table with hosts in `hosts_file`
        or generated random IP addresses for testing"""
-    scan_date = None
     if permutation_elts is not None:
-        scan_date = date.today()
         hosts_ips = generate_random_ips(permutation_elts)
         hosts = [(scan_date, ip, '', 0, 0, 0, 0, random.randint(1, 3)) for ip in hosts_ips]
     else:
-        scan_date = hosts_file
         hosts_file_full_path = f"{config['DB']['hosts_files_dir']}/{hosts_file}"
+        hosts = []
         try:
-            with open(hosts_file_full_path, 'r') as reader:
-                hosts_ips = reader.read().splitlines()
-            # The scan_priority field here should be provided in the host file
-            hosts = [(scan_date, ip, '', 0, 0, 0, 0, random.randint(1, 3)) for ip in hosts_ips]
+            with open(hosts_file_full_path, 'r') as file_input:
+                csv_input = csv.reader(file_input, delimiter=',')
+                for row in csv_input:
+                    hosts.append((scan_date, row[0], '', 0, 0, 0, 0, row[1]))
         except FileNotFoundError:
             logging.error('File %s does not exist', hosts_file_full_path)
-            hosts = []
 
     with conn:
         cur = conn.cursor()
