@@ -254,35 +254,40 @@ def start_tasks(
         client.update_task_state(name=task_name, state=next_task_state)
 
 
-def get_scanned_hosts(
+
+def get_results(
         client: GMPClient, task_name=None, task_config=None, task_states=['finished'],
         next_task_state='obsolete', next_target_state='scanned'):
     """
-    Returns scanned hosts.
+    Returns results in the last reports generated for each task in a task set.
 
     :param task_name: name of the task from which to get the scanned hosts.
     :param task_config: get scanned hosts from the tasks having `task_config`.
-    :param states: get scanned hosts from the tasks in `states`.
-    :return: list of scanned hosts.
+    :param task_states: get results from the tasks in state`states`.
+    :param next_task_state: next state of the task.
+    :param next_target_state: next state of the target.
+    :return: result objects.
     """
-    state_filter = create_comment('state', task_states)
+    results = []
 
+    state_filter = create_comment('state', task_states)
     _filter = f'rows=-1 {state_filter}' if task_name is None else f'rows=-1 name={task_name} and {state_filter}'
 
-    scanned_hosts = []
     for task in client.get_tasks(task_config=task_config, filter=_filter):
         task_name = task.xpath('name/text()')[0]
+        task_id = client.get_task_id(name=task_name)
         task_target = task.xpath('target/name/text()')[0]
-        task_report_id = task.xpath('last_report/report')[0].get('id')
-        task_report = client.get_report(report_id=task_report_id, details=True)
+        report_id = task.xpath('last_report/report')[0].get('id')
+
+        task_results = client.get_results(
+            filter=f'rows=-1 report_id={report_id} task_id={task_id}')
+
+        results.extend(task_results)
 
         client.update_task_state(name=task_name, state=next_task_state)
         client.update_target_state(name=task_target, state=next_target_state)
 
-        scanned_hosts.extend(task_report[0].xpath('report/host/ip/text()'))
-        logging.info('Scanned hosts by task %s: %s', task.xpath('name/text()')[0], scanned_hosts)
-
-    return list(set(scanned_hosts))
+    return results
 
 
 def active_tasks_per_scanner(client: GMPClient, scanner_name=None, scanner_used_for=['scan']):
@@ -422,13 +427,13 @@ def run_discovery(client: GMPClient, db_conn, hosts):
         client, task_name=discovery_task, states=['d/started'],
         task_finished_state='d/finished', task_failed_state='d/failed', task_stopped_state='d/stopped')
 
-    discovered_hosts = get_scanned_hosts(
+    results = get_results(
         client, task_name=discovery_task, task_states=['d/finished'],
         next_task_state='d/obsolete', next_target_state='d/scanned')
 
+    discovered_hosts = list(set([result.xpath('host/text()')[0] for result in results]))
+
     update_discovered_hosts(db_conn, discovered_hosts)
-    deleted_tasks = delete_tasks(client, task_name=discovery_task, ultimate=True, states=['d/obsolete'])
-    deleted_targets = delete_targets(client, target_name=discovery_target, states=['d/scanned'])
 
     # Initialise selected_for_discovery attribute to 0 to declare the end of a discovery
     if discovery_task in deleted_tasks and discovery_target in deleted_targets:
@@ -456,7 +461,8 @@ def run_scan(client: GMPClient, db_conn, hosts):
     assign_tasks(client)
     start_tasks(client)
     check_task_completion(client)
-    scanned_hosts = get_scanned_hosts(client)
+    results = get_results(client)
+    scanned_hosts = list(set([result.xpath('host/text()')[0] for result in results]))
     update_discovered_hosts(db_conn, scanned_hosts, False)
     delete_tasks(client, ultimate=True)
     delete_targets(client)

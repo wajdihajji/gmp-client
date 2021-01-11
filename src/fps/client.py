@@ -72,6 +72,11 @@ class GMPClient(object):
         return gmp.get_report(report_id=report_id, *argv, **kwargs)
 
     @authenticate
+    def get_results(self, gmp, *argv, **kwargs):
+        """Returns results."""
+        return gmp.get_results(*argv, **kwargs).xpath('result')
+
+    @authenticate
     def get_scanners(self, gmp, *argv, **kwargs):
         """Returns scanners."""
         return gmp.get_scanners(*argv, **kwargs).xpath('scanner')
