@@ -141,9 +141,12 @@ def get_hosts(conn, selected_for_discovery, seen_up, selected_for_scan, scanned,
 
     hosts_high_priority = [row[0] for row in rows if row[1] == rows[0][1]]
 
-    logging.info(('get_hosts(selected_for_discovery=%s, seen_up=%s, selected_for_scan=%s, scanned=%s) '
-                  'returns %s rows with priority %s'),
-                 selected_for_discovery, seen_up, selected_for_scan, scanned, len(hosts_high_priority), rows[0][1])
+    log_msg = 'No hosts found for scan/discovery'
+
+    if len(hosts_high_priority) > 0:
+        log_msg = f'Returns {len(hosts_high_priority)} hosts for scan/discovery with priority {rows[0][1]}'
+
+    logging.info(log_msg)
 
     return hosts_high_priority
 
