@@ -12,8 +12,35 @@ import random
 import sqlite3
 from datetime import datetime
 
+import psycopg2
+
 config = configparser.ConfigParser()
 config.read('config.ini')
+
+secrets = configparser.ConfigParser()
+secrets.read('secrets.ini')
+
+
+def printProgressBar(iteration, total, prefix='', suffix='', decimals=1, length=100, fill='|', printEnd="\r"):
+    """
+    Call in a loop to create terminal progress bar
+    @params:
+        iteration   - Required  : current iteration (Int)
+        total       - Required  : total iterations (Int)
+        prefix      - Optional  : prefix string (Str)
+        suffix      - Optional  : suffix string (Str)
+        decimals    - Optional  : positive number of decimals in percent complete (Int)
+        length      - Optional  : character length of bar (Int)
+        fill        - Optional  : bar fill character (Str)
+        printEnd    - Optional  : end character (e.g. "\r", "\r\n") (Str)
+    """
+    percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
+    filledLength = int(length * iteration // total)
+    bar = fill * filledLength + '-' * (length - filledLength)
+    print(f'\r{prefix} |{bar}| {percent}% {suffix}', end=printEnd)
+    # Print New Line on Complete
+    if iteration == total:
+        print()
 
 
 def generate_random_ips(range_length):
@@ -29,6 +56,20 @@ def get_key_by_value(dictionary, searched_value):
             return key
 
     return None
+
+
+def create_pg_conn(
+        host=config['PG']['host'], database=config['PG']['database'], port=config['PG']['port'],
+        user=secrets['PG']['user'], password=secrets['PG']['password']):
+    """Creates a Postgres connection."""
+    conn = None
+    try:
+        conn = psycopg2.connect(
+            host=host, database=database, user=database, password=password, port=port)
+    except (Exception, psycopg2.DatabaseError) as error:
+        logging.error(error)
+
+    return conn
 
 
 def create_sqlite_conn(db_file=config['SQLITE']['sqlite_file']):
@@ -83,7 +124,30 @@ def populate_hosts_table(conn, scan_day=datetime.today().isoweekday(), hosts_fil
         for host in hosts:
             insert_host(conn, host)
 
+
+def insert_report(conn, report):
+    """Inserts a new report."""
+    try:
+        sql = """INSERT INTO
+        reports (
+            ipaddr,
+            port,
+            portdesc,
+            nid,
+            risk,
+            severity,
+            synopsis,
+            report,
+            date_create,
+            date_update)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
+        cur = conn.cursor()
+        cur.execute(sql, report)
         conn.commit()
+    except (Exception, psycopg2.DatabaseError) as error:
+        logging.error(error)
+
+    return cur.lastrowid
 
 
 def insert_host(conn, host):
@@ -128,6 +192,48 @@ def initialise_host_attribute(conn, attribute, value, scan_day=datetime.today().
         logging.error(error)
 
     return cur.lastrowid
+
+
+def import_hosts(pg_conn, sqlite_conn, day_id=datetime.today().isoweekday()):
+    """Imports hosts from the probing database."""
+    regular_scan_cursor = None
+    try:
+        sql = (f'select I.ipaddr as ipaddr from '
+               f'(select ipaddr from ipaddr_inst except select ipaddr from ipaddr_blacklist) as I, '
+               f'(select day, netblock from probing_schedule) as S '
+               f'where I.ipaddr << S.netblock and S.day = {day_id}')
+        regular_scan_cursor = pg_conn.cursor()
+        regular_scan_cursor.execute(sql)
+    except (Exception, psycopg2.DatabaseError) as error:
+        logging.error(error)
+
+    user_scan_cursor = None
+    try:
+        sql = 'select ipaddr from ipaddr_rescan'
+        user_scan_cursor = pg_conn.cursor()
+        user_scan_cursor.execute(sql)
+    except (Exception, psycopg2.DatabaseError) as error:
+        logging.error(error)
+
+    if regular_scan_cursor is not None:
+        hosts = regular_scan_cursor.fetchall()
+        if len(hosts) > 0:
+            printProgressBar(0, len(hosts), prefix='Importing FPS scans:', suffix='Complete', length=50)
+            i = 0
+            for item in hosts:
+                insert_host(sqlite_conn, (day_id, item[0], '', 0, 0, 0, 0, 2))
+                printProgressBar(i + 1, len(hosts), prefix='Importing FPS scans:', suffix='Complete', length=50)
+                i += 1
+
+    if user_scan_cursor is not None:
+        hosts = user_scan_cursor.fetchall()
+        if len(hosts) > 0:
+            printProgressBar(0, len(hosts), prefix='Importing USER scans:', suffix='Complete', length=50)
+            i = 0
+            for item in hosts:
+                insert_host(sqlite_conn, (day_id, item[0], '', 0, 0, 0, 0, 1))
+                printProgressBar(i + 1, len(hosts), prefix='Importing USER scans:', suffix='Complete', length=50)
+                i += 1
 
 
 def get_hosts(
