@@ -7,7 +7,8 @@ import uuid
 
 from fps.client import GMPClient
 from fps.utils import (export_results, get_key_by_value,
-                       update_discovered_hosts, update_host_attribute)
+                       reset_discovery_attribute, update_discovered_hosts,
+                       update_host_attribute)
 
 config = configparser.ConfigParser()
 config.read('config.ini')
@@ -434,9 +435,14 @@ def run_discovery(client: GMPClient, sqlite_conn, pg_conn, hosts):
 
     update_discovered_hosts(sqlite_conn, discovered_hosts)
 
-    # Initialise selected_for_discovery attribute to 0 to declare the end of a discovery
-    if discovery_task in deleted_tasks and discovery_target in deleted_targets:
-        initialise_host_attribute(db_conn, 'selected_for_discovery', 0)
+    deleted_tasks = delete_tasks(client, task_name=discovery_task, ultimate=True, states=['d/obsolete'])
+    deleted_targets = delete_targets(client, target_name=discovery_target, states=['d/scanned'])
+
+    # If discovery task and target have been deleted, all hosts checked if alive
+    # and `rerun_discovery` config parameter is set to true, then update `selected_for_discovery`
+    if config['DISCOVERY'].getboolean('rerun_discovery') and \
+            discovery_task in deleted_tasks and discovery_target in deleted_targets:
+        reset_discovery_attribute(sqlite_conn)
 
 
 def run_scan(client: GMPClient, db_conn, pg_conn, hosts):
