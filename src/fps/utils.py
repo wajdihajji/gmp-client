@@ -116,7 +116,7 @@ def populate_hosts_table(conn, scan_day=datetime.today().isoweekday(), hosts_fil
                 csv_reader = csv.reader(file_input, delimiter=',')
                 next(csv_reader)
                 for row in csv_reader:
-                    hosts.append((row[0], row[1], '', 0, 0, 0, 0, row[2]))
+                    hosts.append((row[0], row[1].strip(), '', 0, 0, 0, 0, row[2]))
         except FileNotFoundError:
             logging.error('File %s does not exist', hosts_file_full_path)
 
@@ -363,6 +363,7 @@ def update_host_attribute(conn, attribute, value, ip_address, scan_day=datetime.
     """Set host's `attribute` to `value`."""
     try:
         sql = f'update hosts set {attribute} = ? where ip_address = ? and scan_day = ?'
+        print(sql, ip_address, scan_day, attribute, value)
         cur = conn.cursor()
         cur.execute(sql, (value, ip_address, scan_day))
         conn.commit()
