@@ -337,7 +337,7 @@ def export_results(conn, results):
     for ip in sorted(ips):
         if ip in ipnids.keys():
             for nid in ipnids[ip]:
-                update_report_date_delete(conn, string_to_datetime(timestamp), ip, nid)
+                update_report_date_delete(conn, timestamp, ip, nid)
 
 
 def insert_host(conn, host):
