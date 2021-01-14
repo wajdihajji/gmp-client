@@ -1,0 +1,15 @@
+version: "3.5"
+services:
+  gmp-client:
+    build:
+      context: .
+    volumes:
+      - /path/to/gvm/certs:/certs
+      - $PWD:/usr/src/app:rw
+    networks:
+      - gvm-network
+
+networks:
+  # GVM daemon should be accessible in this network
+  gvm-network:
+    external: true

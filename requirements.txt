@@ -1,2 +1,4 @@
 gvm-tools==20.10.1
 python-gvm==20.9.1
+schedule
+psycopg2

@@ -1,12 +1,16 @@
 """
 GMP client class to run operations on GVM daemon.
 """
+import configparser
 import logging
 from functools import wraps
 
 from gvm.connections import TLSConnection
 from gvm.protocols.gmp import Gmp
 from gvm.transforms import EtreeTransform
+
+config = configparser.ConfigParser()
+config.read(['config.ini', 'secrets.ini'])
 
 
 def authenticate(func):
@@ -27,15 +31,12 @@ class GMPClient(object):
     """
     GMP Client class to connect to GVM daemon and run operations on.
     """
-    def __init__(self, gvm_hostname, gvm_port, gmp_username, gmp_password, certs_path=None):
-        self.gvm_hostname = gvm_hostname
-        self.gvm_port = gvm_port
-        self.gmp_username = gmp_username
-        self.gmp_password = gmp_password
-        self.certs_path = certs_path
-        self.tls_connection = None
-
-    def __call__(self):
+    def __init__(self):
+        self.gvm_hostname = config['GVM']['gvmd_hostname']
+        self.gvm_port = config.getint('GVM', 'gvmd_port')
+        self.gmp_username = config['GVM']['gmp_username']
+        self.gmp_password = config['GVM']['gmp_password']
+        self.certs_path = config['GVM']['certs_path']
         self.tls_connection = self._create_tls_connection()
 
     def _create_tls_connection(self):
@@ -69,6 +70,11 @@ class GMPClient(object):
     def get_report(self, gmp, report_id, *argv, **kwargs):
         """Returns report having `report_id`."""
         return gmp.get_report(report_id=report_id, *argv, **kwargs)
+
+    @authenticate
+    def get_results(self, gmp, *argv, **kwargs):
+        """Returns results."""
+        return gmp.get_results(*argv, **kwargs).xpath('result')
 
     @authenticate
     def get_scanners(self, gmp, *argv, **kwargs):
@@ -134,23 +140,22 @@ class GMPClient(object):
         return gmp.get_configs(*argv, **kwargs).xpath('config')
 
     @authenticate
-    def create_credential(self, gmp, name, certs_path='/certs', *args, **kwargs):
+    def create_credential(self, gmp, name, *args, **kwargs):
         """
         Creates a `CLIENT_CERTIFICATE` credential.
 
         :param name: credential name.
-        :param certs_path: path where to find cert.pem and key.pem files.
         :return: `True` if credential exists, otherwise, `gmp.create_credential()`'s result.
         """
         if len(self.get_credentials(filter=f'name="{name}"')) > 0:
-            logging.info('Credential already exists.')
-            return True
+            logging.info('Credential %s already exists', name)
+            return {'status_text': 'Credential already exists'}
 
-        with open(f'{certs_path}/cert.pem', 'r') as reader:
+        with open(f'{self.certs_path}/cert.pem', 'r') as reader:
             certificate = reader.read()
             kwargs['certificate'] = certificate
 
-        with open(f'{certs_path}/key.pem', 'r') as reader:
+        with open(f'{self.certs_path}/key.pem', 'r') as reader:
             private_key = reader.read()
             kwargs['private_key'] = private_key
 
@@ -161,27 +166,26 @@ class GMPClient(object):
 
     @authenticate
     def create_scanner(
-            self, gmp, name, host, credential='remote_scanner', port=9391, certs_path='/certs', **kwargs):
+            self, gmp, name, host, credential, port=9391, **kwargs):
         """
         Creates a scanner.
 
         :param name: scanner name.
         :param host: scanner hostname.
         :param credential: `CLIENT_CERTIFICATE` credential.
-        :param certs_path: cacert.pem file path.
         :return: `True` if scanner already exists, `False` if missing info, otherwise, `create_scanner`'s result.
         """
         if self.get_scanner_id(name=name) is not None:
-            logging.info('Scanner %s already exists.', name)
-            return {'status_text': 'Scanner already exists.'}
+            logging.info('Scanner %s already exists', name)
+            return {'status_text': 'Scanner already exists'}
 
         if len(self.get_credentials(filter=f'name={credential}')) == 0:
-            logging.warn('Credential %s does not exist.', credential)
-            return False
+            logging.warn('Credential %s does not exist', credential)
+            return {'status_text': 'Credential does not exist'}
 
         credential_id = self.get_credentials(filter=f'name={credential}')[0].get('id')
 
-        with open(f'{certs_path}/cacert.pem', 'r') as reader:
+        with open(f'{self.certs_path}/cacert.pem', 'r') as reader:
             ca_pub = reader.read()
 
         return gmp.create_scanner(
@@ -199,8 +203,8 @@ class GMPClient(object):
         """
         scanner_id = self.get_scanner_id(name=name)
         if scanner_id is None:
-            logging.info('Scanner %s does not exist.', name)
-            return None
+            logging.info('Scanner %s does not exist', name)
+            return {'status_text': 'Scanner does not exist'}
 
         return gmp.modify_scanner(scanner_id=scanner_id, comment=f'used_for:{used_for}')
 
@@ -212,10 +216,10 @@ class GMPClient(object):
         :param name: scanner name.
         :param ultimate: move to trash or delete permanently.
         """
-        scanner_id = self.get_scanner_id(name)
+        scanner_id = self.get_scanner_id(name=name)
         if scanner_id is None:
-            logging.info('Scanner %s does not exist.', name)
-            return True
+            logging.info('Scanner %s does not exist', name)
+            return {'status_text': 'Scanner does not exist'}
 
         return gmp.delete_scanner(scanner_id=scanner_id, ultimate=ultimate)
 
@@ -233,17 +237,17 @@ class GMPClient(object):
         """
         target_id = self.get_target_id(name=name)
         if target_id is not None:
-            logging.info('Target %s already exists.', name)
-            return None
+            logging.info('Target %s already exists', name)
+            return {'status_text': 'Target already exists'}
 
         if len(hosts) == 0:
-            logging.info('No hosts provided to create the target %s.', name)
-            return None
+            logging.info('No hosts provided to create the target %s', name)
+            return {'status_text': 'No hosts'}
 
         port_list_id = self.get_port_list_id(name=port_list_name)
         if port_list_id is None:
-            logging.info('Port list %s does not exist.', port_list_name)
-            return None
+            logging.info('Port list %s does not exist', port_list_name)
+            return {'status_text': 'Port list does not exist'}
 
         comment = "" if state is None else f'state:{state}'
 
@@ -261,8 +265,8 @@ class GMPClient(object):
         """
         target_id = self.get_target_id(name=name)
         if target_id is None:
-            logging.info('Target %s does not exist.', name)
-            return False
+            logging.info('Target %s does not exist', name)
+            return {'status_text': 'Target does not exist'}
 
         return gmp.modify_target(target_id=target_id, comment=f'state:{state}')
 
@@ -279,8 +283,8 @@ class GMPClient(object):
         """
         port_list_id = self.get_port_list_id(name=port_list_name)
         if port_list_id is None:
-            logging.info('Port list %s does not exist.', port_list_name)
-            return False
+            logging.info('Port list %s does not exist', port_list_name)
+            return {'status_text': 'Port list does not exist'}
 
         port_range_type = getattr(gmp.types.PortRangeType, protocol)
 
@@ -298,8 +302,8 @@ class GMPClient(object):
         """
         port_list_id = self.get_port_list_id(name=name)
         if port_list_id is not None:
-            logging.info('Port list %s already exists.', name)
-            return True
+            logging.info('Port list %s already exists', name)
+            return {'status_text': 'Port list already exists'}
 
         return gmp.create_port_list(name, port_range)
 
@@ -318,23 +322,23 @@ class GMPClient(object):
         """
         task_id = self.get_task_id(name=name)
         if task_id is not None:
-            logging.info('Task %s already exists.', name)
-            return True
+            logging.info('Task %s already exists', name)
+            return {'status_text': 'Task already exists'}
 
         config_id = self.get_config_id(name=config_name)
         if config_id is None:
-            logging.info('Config %s does not exist.', config_name)
-            return False
+            logging.info('Config %s does not exist', config_name)
+            return {'status_text': 'Task Config does not exist'}
 
         target_id = self.get_target_id(name=target_name)
         if target_id is None:
-            logging.info('Target %s does not exist.', target_name)
-            return False
+            logging.info('Target %s does not exist', target_name)
+            return {'status_text': 'Target does not exist'}
 
         scanner_id = self.get_scanner_id(name=scanner_name)
         if scanner_id is None:
-            logging.info('Scanner %s does not exist.', scanner_name)
-            return False
+            logging.info('Scanner %s does not exist', scanner_name)
+            return {'status_text': 'Scanner does not exist'}
 
         return gmp.create_task(
             name=name, config_id=config_id, target_id=target_id, scanner_id=scanner_id,
@@ -355,23 +359,23 @@ class GMPClient(object):
         """
         task_id = self.get_task_id(name=name)
         if task_id is None:
-            logging.info('Task %s does not exist.', name)
-            return False
+            logging.info('Task %s does not exist', name)
+            return {'status_text': 'Task does not exist'}
 
         config_id = self.get_config_id(name=config_name)
         if config_id is None:
-            logging.info('Config %s does not exist.', config_name)
-            return False
+            logging.info('Config %s does not exist', config_name)
+            return {'status_text': 'Task Config does not exist'}
 
         target_id = self.get_target_id(name=target_name)
         if target_id is None:
-            logging.info('Target %s does not exist.', target_name)
-            return False
+            logging.info('Target %s does not exist', target_name)
+            return {'status_text': 'Target does not exist'}
 
         scanner_id = self.get_scanner_id(name=scanner_name)
         if scanner_id is None:
-            logging.info('Scanner %s does not exist.', scanner_name)
-            return False
+            logging.info('Scanner %s does not exist', scanner_name)
+            return {'status_text': 'Scanner does not exist'}
 
         return gmp.modify_task(
             task_id=task_id, config_id=config_id,
@@ -388,8 +392,8 @@ class GMPClient(object):
         """
         task_id = self.get_task_id(name=name)
         if task_id is None:
-            logging.info('Task %s does not exist.', name)
-            return False
+            logging.info('Task %s does not exist', name)
+            return {'status_text': 'Task does not exist'}
 
         return gmp.modify_task(task_id=task_id, comment=f'state:{state}')
 
@@ -404,13 +408,13 @@ class GMPClient(object):
         """
         task_id = self.get_task_id(name=name)
         if task_id is None:
-            logging.info('Task %s does not exist.', name)
-            return False
+            logging.info('Task %s does not exist', name)
+            return {'status_text': 'Task does not exist'}
 
         scanner_id = self.get_scanner_id(name=scanner_name)
         if scanner_id is None:
-            logging.info('Scanner %s does not exist.', scanner_name)
-            return False
+            logging.info('Scanner %s does not exist', scanner_name)
+            return {'status_text': 'Scanner does not exist'}
 
         return gmp.modify_task(task_id=task_id, scanner_id=scanner_id)
 
@@ -425,13 +429,13 @@ class GMPClient(object):
         """
         task_id = self.get_task_id(name=name)
         if task_id is None:
-            logging.info('Task %s does not exist.', name)
-            return False
+            logging.info('Task %s does not exist', name)
+            return {'status_text': 'Task does not exist'}
 
         target_id = self.get_target_id(name=target_name)
         if target_id is None:
-            logging.info('Target %s does not exist.', target_name)
-            return False
+            logging.info('Target %s does not exist', target_name)
+            return {'status_text': 'Target does not exist'}
 
         return gmp.modify_task(task_id=task_id, target_id=target_id)
 
@@ -446,8 +450,8 @@ class GMPClient(object):
         """
         task_id = self.get_task_id(name=name)
         if task_id is None:
-            logging.info('Task %s does not exist.', name)
-            return False
+            logging.info('Task %s does not exist', name)
+            return {'status_text': 'Task does not exist'}
 
         return gmp.delete_task(task_id=task_id, ultimate=ultimate)
 
@@ -462,8 +466,8 @@ class GMPClient(object):
         """
         target_id = self.get_target_id(name=name)
         if target_id is None:
-            logging.info('Target %s does not exist.', name)
-            return False
+            logging.info('Target %s does not exist', name)
+            return {'status_text': 'Target does not exist'}
 
         return gmp.delete_target(target_id=target_id, ultimate=ultimate)
 
@@ -477,7 +481,7 @@ class GMPClient(object):
         """
         task_id = self.get_task_id(name=name)
         if task_id is None:
-            logging.info('Task %s does not exist.', name)
-            return False
+            logging.info('Task %s does not exist', name)
+            return {'status_text': 'Task does not exist'}
 
         return gmp.start_task(task_id=task_id)
