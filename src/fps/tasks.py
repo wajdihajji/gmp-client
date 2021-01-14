@@ -397,7 +397,7 @@ def initialise_scan(client: GMPClient):
         client, num_scanners, scanner_name_prefix, scanner_host_prefix, scanner_credential)
 
 
-def run_discovery(client: GMPClient, db_conn, pg_conn, hosts):
+def run_discovery(client: GMPClient, sqlite_conn, pg_conn, hosts):
     """Runs discovery task."""
     discovery_task = config['DISCOVERY']['task_name']
     discovery_target = config['DISCOVERY']['target_name']
@@ -418,7 +418,7 @@ def run_discovery(client: GMPClient, db_conn, pg_conn, hosts):
     if result.get('status') == '201':
         client.create_task(name=discovery_task, state='d/has_scanner', **task_config)
         for host in hosts:
-            update_host_attribute(db_conn, 'selected_for_discovery', 1, host)
+            update_host_attribute(sqlite_conn, 'selected_for_discovery', 1, host)
 
     start_tasks(client, task_name=discovery_task, states=['d/has_scanner'], next_task_state='d/started')
 
@@ -432,7 +432,7 @@ def run_discovery(client: GMPClient, db_conn, pg_conn, hosts):
 
     discovered_hosts = list(set([result.xpath('host/text()')[0] for result in results]))
 
-    update_discovered_hosts(db_conn, discovered_hosts)
+    update_discovered_hosts(sqlite_conn, discovered_hosts)
 
     # Initialise selected_for_discovery attribute to 0 to declare the end of a discovery
     if discovery_task in deleted_tasks and discovery_target in deleted_targets:
