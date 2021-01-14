@@ -9,6 +9,7 @@ import csv
 import itertools
 import logging
 import random
+import re
 import sqlite3
 from datetime import datetime
 
@@ -120,34 +121,224 @@ def populate_hosts_table(conn, scan_day=datetime.today().isoweekday(), hosts_fil
             logging.error('File %s does not exist', hosts_file_full_path)
 
     with conn:
-        logging.info('Creating %s entries in table hosts to be scanned on day %s...', len(hosts), scan_day)
+        logging.info('Creating %s entries in table hosts', len(hosts))
         for host in hosts:
             insert_host(conn, host)
+
+
+def string_to_datetime(datestring):
+    """Converts a date/time string as output by OpenVAS into a Python datetime object."""
+    a = list(map(int, re.sub("[^0-9]", ' ', datestring).split()))
+    return datetime(a[0], a[1], a[2], a[3], a[4], a[5])
+
+
+def create_portdesc_dict(service_file='/etc/services'):
+    """Creates port description dict."""
+    portdesc = {}
+    portdesc['general-ip'] = ' '
+    regex = re.compile(r'^([a-z]\S+)\s+(\d+)/([a-z]+)\s.*')
+    try:
+        with open(service_file, 'r') as services:
+            for line in services:
+                if regex.match(line):
+                    m = regex.match(line)
+                    name = m.group(1)
+                    port = m.group(2)
+                    protocol = m.group(3)
+                    pd = '{}-{}'.format(port, protocol)
+                    portdesc[pd] = name
+    except FileNotFoundError:
+        logging.error('File %s does not exist', service_file)
+
+    return portdesc
+
+
+def get_portdesc(portdesc_dict, port):
+    """Returns port description of a port."""
+    return ' ' if portdesc_dict.get(port) is None else portdesc_dict.get(port)
+
+
+def severity_to_threat(severity):
+    """Map risks to numerical values."""
+    if float(severity) == 0:
+        return 0
+    elif float(severity) <= 3.9:
+        return 1
+    elif float(severity) <= 6.9:
+        return 2
+    elif float(severity) <= 8.9:
+        return 3
+    else:
+        return 4
 
 
 def insert_report(conn, report):
     """Inserts a new report."""
     try:
-        sql = """INSERT INTO
-        reports (
-            ipaddr,
-            port,
-            portdesc,
-            nid,
-            risk,
-            severity,
-            synopsis,
-            report,
-            date_create,
-            date_update)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
+        sql = '''INSERT INTO reports_test (
+                 ipaddr, port, portdesc, nid, risk, severity,
+                 synopsis, report, date_create, date_update)
+                 values(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)'''
         cur = conn.cursor()
         cur.execute(sql, report)
         conn.commit()
+        return cur.lastrowid
     except (Exception, psycopg2.DatabaseError) as error:
         logging.error(error)
 
-    return cur.lastrowid
+
+def update_report(conn, report):
+    """Updates an existing report."""
+    try:
+        sql = '''update reports_test set
+                 port = %s, portdesc = %s, risk = %s, severity = %s,
+                 synopsis = %s, report = %s, date_update = %s
+                 where ipaddr = %s and nid = %s and date_delete IS NULL'''
+        cur = conn.cursor()
+        cur.execute(
+            sql,
+            (report[1], report[2], report[4], report[5],
+             report[6], report[7], report[8], report[0], report[3]))
+        conn.commit()
+        return cur.lastrowid
+    except (Exception, psycopg2.DatabaseError) as error:
+        logging.error(error)
+
+
+def update_report_date_delete(conn, date_delete, ipaddr, nid):
+    """Updates report's `date_delete`."""
+    try:
+        sql = 'update reports_test set date_delete = %s where ipaddr = %s and nid = %s'
+        cur = conn.cursor()
+        cur.execute(sql, (date_delete, ipaddr, nid))
+        conn.commit()
+        return cur.lastrowid
+    except (Exception, psycopg2.DatabaseError) as error:
+        logging.error(error)
+
+
+def create_report(result, portdesc_dict):
+    """Creates a report from a result object."""
+    creation_time = result.xpath('creation_time/text()')[0]
+    port = result.xpath('port/text()')[0]
+    ip_address = result.xpath('host/text()')[0]
+    # description = next(iter(result.xpath('description/text()') or []), None)
+    nvt_oid = result.xpath('nvt')[0].get('oid')
+    tags = result.xpath('nvt/tags/text()')[0]
+    severity = result.xpath('severity/text()')[0]
+    nvt_name = result.xpath('nvt/name/text()')[0]
+    cvss = result.xpath('nvt/cvss_base/text()')[0]
+
+    portdesc = get_portdesc(portdesc_dict, port)
+
+    refs = []
+    for ref in result.xpath('nvt/refs/ref'):
+        refs.append(ref.get('id'))
+
+    references = '\n'.join(refs)
+
+    summary = re.search(r'summary=([\s\S]*?)\|', tags)
+    insight = re.search(r'insight=([\s\S]*?)\|', tags)
+    affected = re.search(r'affected=([\s\S]*?)\|', tags)
+    impact = re.search(r'impact=([\s\S]*?)\|', tags)
+    solution = re.search(r'solution=([\s\S]*?)\|', tags)
+    detection = re.search(r'vuldetect=([\s\S]*?)\|', tags)
+    soltype = re.search(r'solution_type=([\s\S]*?)$', tags)
+
+    cve = specresult = report = None
+
+    report = f'''Network Vulnerability Test: {nvt_name}
+
+    Synopsis:
+    {'N/A' if summary is None else summary.group(1)}
+
+    Impact:
+    {'N/A' if impact is None else impact.group(1)}
+
+    Description:
+    {'N/A' if insight is None else insight.group(1)}
+
+    Solution:
+    {'N/A' if solution is None else solution.group(1)}
+
+    Solution type: {'N/A' if soltype is None else soltype.group(1)}
+
+    Risk Factor: {severity}
+
+    CVSS Base Score: {cvss}
+
+    CVE: {cve}
+
+    Severity: {severity}
+
+    Detection Method:
+    {'N/A' if detection is None else detection.group(1)}
+
+    Specific Result:
+    {specresult}
+
+    Affected Software/OS:
+    {'N/A' if affected is None else affected.group(1)}
+
+    Other References:
+    {references}
+    '''
+
+    return (ip_address, port, portdesc, nvt_oid, severity_to_threat(severity),
+            cvss, nvt_name, report, string_to_datetime(creation_time),
+            string_to_datetime(creation_time))
+
+
+def export_results(conn, results):
+    """Exports results to the probing DB."""
+    report_rows = []
+    try:
+        cur = conn.cursor()
+        cur.execute('select ipaddr, nid, date_create, date_update from reports_test where date_delete is null')
+        report_rows = cur.fetchall()
+    except (Exception, psycopg2.DatabaseError) as error:
+        logging.error(error)
+
+    existing = {}
+    ipnids = {}
+    for row in report_rows:
+        existing[row[0] + '-' + row[1]] = (row[2], row[3])
+        if row[0] not in ipnids.keys():
+            ipnids[row[0]] = set({})
+        ipnids[row[0]] |= {row[1]}
+
+    portdesc_dict = create_portdesc_dict()
+    ips = set({})
+    for result in results:
+        nvt_oid = result.xpath('nvt')[0].get('oid')
+        if nvt_oid in ['1.3.6.1.4.1.25623.1.0.999998', '1.3.6.1.4.1.25623.1.0.108560']:
+            continue
+
+        ip_address = result.xpath('host/text()')[0]
+        ips |= {ip_address}
+
+        key = f'{ip_address}-{nvt_oid}'
+        report = create_report(result, portdesc_dict)
+
+        is_insert = True
+        if key not in existing.keys():
+            insert_report(conn, report)
+        else:
+            is_insert = False
+            update_report(conn, report)
+
+        if ip_address in ipnids.keys():
+            ipnids[ip_address] -= {nvt_oid}
+
+        logging.info(
+            'Result of IP address %s and NVT OID %s has been %s',
+            ip_address, nvt_oid, 'inserted' if is_insert else 'updated')
+
+    timestamp = datetime.now()
+    for ip in sorted(ips):
+        if ip in ipnids.keys():
+            for nid in ipnids[ip]:
+                update_report_date_delete(conn, string_to_datetime(timestamp), ip, nid)
 
 
 def insert_host(conn, host):

@@ -6,7 +6,7 @@ import logging
 import uuid
 
 from fps.client import GMPClient
-from fps.utils import (get_key_by_value, initialise_host_attribute,
+from fps.utils import (export_results, get_key_by_value,
                        update_discovered_hosts, update_host_attribute)
 
 config = configparser.ConfigParser()
@@ -254,7 +254,6 @@ def start_tasks(
         client.update_task_state(name=task_name, state=next_task_state)
 
 
-
 def get_results(
         client: GMPClient, task_name=None, task_config=None, task_states=['finished'],
         next_task_state='obsolete', next_target_state='scanned'):
@@ -398,7 +397,7 @@ def initialise_scan(client: GMPClient):
         client, num_scanners, scanner_name_prefix, scanner_host_prefix, scanner_credential)
 
 
-def run_discovery(client: GMPClient, db_conn, hosts):
+def run_discovery(client: GMPClient, db_conn, pg_conn, hosts):
     """Runs discovery task."""
     discovery_task = config['DISCOVERY']['task_name']
     discovery_target = config['DISCOVERY']['target_name']
@@ -440,7 +439,7 @@ def run_discovery(client: GMPClient, db_conn, hosts):
         initialise_host_attribute(db_conn, 'selected_for_discovery', 0)
 
 
-def run_scan(client: GMPClient, db_conn, hosts):
+def run_scan(client: GMPClient, db_conn, pg_conn, hosts):
     """Runs scan tasks."""
     scanner_name = config['SCAN']['default_scanner_name']
     default_target = config['SCAN']['default_target']
@@ -462,6 +461,7 @@ def run_scan(client: GMPClient, db_conn, hosts):
     start_tasks(client)
     check_task_completion(client)
     results = get_results(client)
+    export_results(pg_conn, results)
     scanned_hosts = list(set([result.xpath('host/text()')[0] for result in results]))
     update_discovered_hosts(db_conn, scanned_hosts, False)
     delete_tasks(client, ultimate=True)
