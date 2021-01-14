@@ -222,7 +222,6 @@ def create_report(result, portdesc_dict):
     creation_time = result.xpath('creation_time/text()')[0]
     port = result.xpath('port/text()')[0]
     ip_address = result.xpath('host/text()')[0]
-    # description = next(iter(result.xpath('description/text()') or []), None)
     nvt_oid = result.xpath('nvt')[0].get('oid')
     tags = result.xpath('nvt/tags/text()')[0]
     severity = result.xpath('severity/text()')[0]
@@ -363,7 +362,6 @@ def update_host_attribute(conn, attribute, value, ip_address, scan_day=datetime.
     """Set host's `attribute` to `value`."""
     try:
         sql = f'update hosts set {attribute} = ? where ip_address = ? and scan_day = ?'
-        print(sql, ip_address, scan_day, attribute, value)
         cur = conn.cursor()
         cur.execute(sql, (value, ip_address, scan_day))
         conn.commit()
