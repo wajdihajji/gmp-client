@@ -48,6 +48,15 @@ def job_run_discovery(gmp_client, sqlite_conn, pg_conn):
 
 
 @with_logging
+def job_import_hosts(sqlite_conn, pg_conn):
+    """Import hosts to scan."""
+    if config['SQLITE'].getboolean('import_hosts_from_file'):
+        populate_hosts_table(sqlite_conn)
+    else:
+        import_hosts(sqlite_conn, pg_conn)
+
+
+@with_logging
 def job_run_scan(gmp_client, sqlite_conn, pg_conn):
     """Runs scan."""
     # Get the hosts that have been seen up, not selected for scan and not yet scanned.
@@ -60,26 +69,33 @@ def job_run_scan(gmp_client, sqlite_conn, pg_conn):
 
 if __name__ == '__main__':
     gmp_client = GMPClient()
+
     sqlite_conn = create_sqlite_conn()
     pg_conn = create_pg_conn()
+
     create_hosts_table(sqlite_conn)
-    import_hosts(pg_conn, sqlite_conn)
+
     initialise_scan(gmp_client)
     initialise_discovery(gmp_client)
+
+    # Import hosts at the initialisation step
+    job_import_hosts(sqlite_conn, pg_conn)
 
     discovery_freq = config.getint('DISCOVERY', 'frequency')
     import_hosts_freq = config.getint('DISCOVERY', 'hosts_import_frequency')
     scan_freq = config.getint('SCAN', 'frequency')
 
-    # Import hosts from the probing DB
+    # Import hosts at `import_hosts_freq` frequency
     schedule.every(import_hosts_freq).minutes.do(
-        import_hosts, pg_conn=pg_conn, sqlite_conn=sqlite_conn)
+        job_import_hosts, sqlite_conn=sqlite_conn, pg_conn=pg_conn)
 
     # Run job_run_discovery every `discovery_freq` minutes
+    schedule.every(discovery_freq).minutes.do(
         job_run_discovery, gmp_client=gmp_client, sqlite_conn=sqlite_conn, pg_conn=pg_conn)
 
     # Run job_run_scan every `scan_freq` minutes
-        job_run_scan, gmp_client=gmp_client, db_conn=sqlite_conn, pg_conn=pg_conn)
+    schedule.every(scan_freq).minutes.do(
+        job_run_scan, gmp_client=gmp_client, sqlite_conn=sqlite_conn, pg_conn=pg_conn)
 
     while True:
         schedule.run_pending()

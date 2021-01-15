@@ -123,7 +123,7 @@ def populate_hosts_table(conn, scan_day=datetime.today().isoweekday(), hosts_fil
         hosts_ips = generate_random_ips(permutation_elts)
         hosts = [(scan_day, ip, '', 0, 0, 0, 0, random.randint(1, 3)) for ip in hosts_ips]
     else:
-        hosts_file_full_path = f"{config['SQLITE']['hosts_files_dir']}/{hosts_file}"
+        hosts_file_full_path = f"{config['SQLITE']['hosts_file_dir']}/{hosts_file}"
         hosts = []
         try:
             with open(hosts_file_full_path, 'r') as file_input:
@@ -398,7 +398,7 @@ def initialise_host_attribute(conn, attribute, value, scan_day=datetime.today().
     return cur.lastrowid
 
 
-def import_hosts(pg_conn, sqlite_conn, day_id=datetime.today().isoweekday()):
+def import_hosts(sqlite_conn, pg_conn, day_id=datetime.today().isoweekday()):
     """Imports hosts from the probing database."""
     regular_scan_cursor = None
     try:
