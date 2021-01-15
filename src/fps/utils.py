@@ -8,6 +8,7 @@ import configparser
 import csv
 import itertools
 import logging
+import os
 import random
 import re
 import sqlite3
@@ -17,9 +18,6 @@ import psycopg2
 
 config = configparser.ConfigParser()
 config.read('config.ini')
-
-secrets = configparser.ConfigParser()
-secrets.read('secrets.ini')
 
 
 def printProgressBar(iteration, total, prefix='', suffix='', decimals=1, length=100, fill='|', printEnd="\r"):
@@ -60,8 +58,9 @@ def get_key_by_value(dictionary, searched_value):
 
 
 def create_pg_conn(
-        host=config['PG']['host'], database=config['PG']['database'], port=config['PG']['port'],
-        user=secrets['PG']['user'], password=secrets['PG']['password']):
+        host=config['PROBING-DB']['host'], database=config['PROBING-DB']['database'],
+        port=config['PROBING-DB']['port'],
+        user=os.getenv('PG_USERNAME'), password=os.getenv('PG_PASSWORD')):
     """Creates a Postgres connection."""
     conn = None
     try:
@@ -73,7 +72,7 @@ def create_pg_conn(
     return conn
 
 
-def create_sqlite_conn(db_file=config['SQLITE']['sqlite_file']):
+def create_sqlite_conn(db_file=config['INTERNAL-DB']['sqlite_file']):
     """
     Creates an SQLite database connection to the DB file `db_file`.
 
@@ -124,7 +123,7 @@ def populate_hosts_table(conn, scan_day=datetime.today().isoweekday(), hosts_fil
         hosts_ips = generate_random_ips(permutation_elts)
         hosts = [(scan_day, ip, '', 0, 0, 0, 0, random.randint(1, 3)) for ip in hosts_ips]
     else:
-        hosts_file_full_path = f"{config['SQLITE']['hosts_file_dir']}/{hosts_file}"
+        hosts_file_full_path = f"{config['INTERNAL-DB']['hosts_file_dir']}/{hosts_file}"
         hosts = []
         try:
             with open(hosts_file_full_path, 'r') as file_input:

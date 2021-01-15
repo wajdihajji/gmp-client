@@ -12,26 +12,21 @@ You may want to review [config.ini](./config.ini) to adjust the default configur
 
 The hosts that will be scanned can either be specified in [data/hosts.csv](./data/hosts.csv) or retrieved from the Probing DB.
 
-All the secrets needed to access GVM daemon and the Probing DB should be provided in the file `secrets.ini` that is supposed to be located in project's top-directory.
-
-Example of `secrets.ini`:
-```ini
-[GVM]
-gmp_username = foo
-gmp_password = bar
-
-[PG]
-user = qux
-password = quux
+The following secrets are needed to access the GVM daemon and the Probing DB and should provided as environment variables.
+```env
+export GMP_USERNAME=foo
+export GMP_PASSWORD=bar
+export PG_USERNAME=qux
+export PG_PASSWORD=quux
 ```
 
 ## Development / Deployment (WIP)
-To build and run the client docker image:
+As prerequisites to build and run the client docker image:
 1. Set the `networks` in [docker-compose.yml](./docker-compose.yml) to GVM daemon's.
-2. Make sure GMP client is mounting the volume containing the GVM certificates.
-3. Define the GVM and Probing DB connection credentials in `secrets.ini`.
+2. Make sure GMP client mount the volume containing the GVM certificates.
+3. Set GVM and Probing DB connection credentials environment variables.
 
-Then,
+Then run,
 ```bash
 docker-compose -f docker-compose.yml up -d
 ```

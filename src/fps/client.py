@@ -3,6 +3,7 @@ GMP client class to run operations on GVM daemon.
 """
 import configparser
 import logging
+import os
 from functools import wraps
 
 from gvm.connections import TLSConnection
@@ -10,7 +11,7 @@ from gvm.protocols.gmp import Gmp
 from gvm.transforms import EtreeTransform
 
 config = configparser.ConfigParser()
-config.read(['config.ini', 'secrets.ini'])
+config.read('config.ini')
 
 
 def authenticate(func):
@@ -34,9 +35,9 @@ class GMPClient(object):
     def __init__(self):
         self.gvm_hostname = config['GVM']['gvmd_hostname']
         self.gvm_port = config.getint('GVM', 'gvmd_port')
-        self.gmp_username = config['GVM']['gmp_username']
-        self.gmp_password = config['GVM']['gmp_password']
         self.certs_path = config['GVM']['certs_path']
+        self.gmp_username = os.getenv('GMP_USERNAME')
+        self.gmp_password = os.getenv('GMP_PASSWORD')
         self.tls_connection = self._create_tls_connection()
 
     def _create_tls_connection(self):

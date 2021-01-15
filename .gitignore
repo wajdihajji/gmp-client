@@ -127,8 +127,8 @@ venv.bak/
 .dmypy.json
 dmypy.json
 
-# config file containing GVM credentials
-secrets.ini
+# Env file for GVM and Probing DB credentials
+secrets.env
 
 # openvas certs
 certs

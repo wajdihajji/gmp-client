@@ -50,7 +50,7 @@ def job_run_discovery(gmp_client, sqlite_conn, pg_conn):
 @with_logging
 def job_import_hosts(sqlite_conn, pg_conn):
     """Import hosts to scan."""
-    if config['SQLITE'].getboolean('import_hosts_from_file'):
+    if config['INTERNAL-DB'].getboolean('import_hosts_from_file'):
         populate_hosts_table(sqlite_conn)
     else:
         import_hosts(sqlite_conn, pg_conn)
