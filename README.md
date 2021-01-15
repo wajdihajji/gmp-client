@@ -1,26 +1,37 @@
 ## Introduction
-The project automates the process of daily-basis vulnerability scanning of thousands of hosts using Greenbone Vulnerability Management (GVM). It creates and manages a set of GVM objects such as tasks and targets responsible for the scanning.
+The project automates the daily-basis vulnerability scan currently provided by the [Friendly Probing Suite](https://gitlab.developers.cam.ac.uk/uis/infra/probing). It interacts with the Greenbone Vulnerability Management system to create and manage the different modules and processes responsible for the scanning.
 
-The idea is inspired from finite-state machine model. The implemented algorithm assigns a state to each object involved in the scanning in a way that it defines what action would be applied on it.
+The implemented algorithm is inspired from the finite-state machine model; it assigns a state to each object involved in the scan and defines the actions that will be applied to it in order to advance the whole process.
 
-## How it works
+## How it works (WIP)
 
 ## Requirements
-In order to test the GMP client codebase, a GVM daemon instance should already be running. You can deploy a containerised version of GVM components by following the instructions in https://gitlab.developers.cam.ac.uk/uis/infra/gvm-deployment. The client will then be able to access the GVM daemon on port `9390`.
+In order to test the GMP client developed in this project, a GVM daemon instance should be running. You can deploy the GVM components by following the instructions in https://gitlab.developers.cam.ac.uk/uis/infra/gvm-deployment. The client will then be able to access the GVM daemon on port `9390`.
 
-You may want to review [config.ini](./config.ini) to adjust the default configuration according to your environment. A file called `secrets.ini` has to exist in the project's top-directory to specify the GVM daemon credentials.
+You may want to review [config.ini](./config.ini) to adjust the default configuration according to your environment. 
+
+The hosts that will be scanned can either be specified in [data/hosts.csv](./data/hosts.csv) or retrieved from the Probing DB.
+
+All the secrets needed to access GVM daemon and the Probing DB should be provided in the file `secrets.ini` that is supposed to be located in project's top-directory.
 
 Example of `secrets.ini`:
 ```ini
 [GVM]
 gmp_username = foo
 gmp_password = bar
+
+[PG]
+user = qux
+password = quux
 ```
 
-The list of hosts to scan can be provided as a file under the directory [data/](./data). The filename must be in the format `YYYY-MM-DD` and should indicate the date on which the hosts would be scanned. For instance, the hosts in the file [data/2020-12-18](./data/2020-12-07) would be scanned on 2020-12-18.
-
 ## Development / Deployment (WIP)
-To build and run the client docker image, set the `networks` in [docker-compose.yml](./docker-compose.yml) to GVM daemon's.
+To build and run the client docker image:
+1. Set the `networks` in [docker-compose.yml](./docker-compose.yml) to GVM daemon's.
+2. Make sure GMP client is mounting the volume containing the GVM certificates.
+3. Define the GVM and Probing DB connection credentials in `secrets.ini`.
+
+Then,
 ```bash
 docker-compose -f docker-compose.yml up -d
 ```
