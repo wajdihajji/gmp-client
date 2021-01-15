@@ -6,7 +6,7 @@ The implemented algorithm is inspired from the finite-state machine model; it as
 ## How it works (WIP)
 
 ## Requirements
-In order to test the GMP client developed in this project, a GVM daemon instance should be running. You can deploy the GVM components by following the instructions in https://gitlab.developers.cam.ac.uk/uis/infra/gvm-deployment. The client will then be able to access the GVM daemon on port `9390`.
+To test the GMP client developed in this project, a GVM daemon should be running. You can deploy the GVM components by following the instructions in https://gitlab.developers.cam.ac.uk/uis/infra/gvm-deployment. The client will then be able to access the GVM daemon on port `9390`.
 
 You may want to review [config.ini](./config.ini) to adjust the default configuration according to your environment. 
 
