@@ -94,10 +94,11 @@ def create_hosts_table(conn):
     try:
         cur = conn.cursor()
         cur.execute('''create table if not exists hosts
-                    (scan_day integer, ip_address text primary key, netmask text,
+                    (scan_day integer, ip_address text, netmask text,
                     selected_for_discovery integer default 0, seen_up integer default 0,
                     selected_for_scan integer default 0, scanned integer default 0,
-                    scan_priority integer default 3)''')
+                    scan_priority integer default 3,
+                    PRIMARY KEY (scan_day, ip_address))''')
         conn.commit()
     except sqlite3.Error as error:
         logging.error(error)

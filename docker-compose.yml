@@ -9,6 +9,25 @@ services:
     networks:
       - gvm-network
 
+  fps-db:
+    image: postgres
+    ports:
+      - 5432:5432
+    environment:
+      - PGDATA=/var/lib/postgresql/data
+      - POSTGRES_DB=probing
+      - POSTGRES_USER=probing
+      - POSTGRES_PASSWORD=probing
+    volumes:
+      # A reference to a probing DB clone for development/testing
+      - /tmp/probing-db.sql:/data/probing-db.sql:rw
+      - fps-data:/var/lib/postgresql/data
+    networks:
+      - gvm-network
+
+volumes:
+  fps-data:
+
 networks:
   # GVM daemon should be accessible in this network
   gvm-network:
