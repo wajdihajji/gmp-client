@@ -130,7 +130,7 @@ def delete_targets(client: GMPClient, target_name=None, states=['scanned'], ulti
 
 def create_scanners(
         client: GMPClient, num_scanners, scanner_name_prefix, scanner_host_prefix,
-        credential, remote_scanner_service, scanner_used_for='scan'):
+        remote_scanner_service, credential, scanner_used_for='scan'):
     """
     Creates a set of scanners.
 
