@@ -130,7 +130,7 @@ def delete_targets(client: GMPClient, target_name=None, states=['scanned'], ulti
 
 def create_scanners(
         client: GMPClient, num_scanners, scanner_name_prefix, scanner_host_prefix,
-        credential, remote_scanner_service=None, scanner_used_for='scan'):
+        credential, remote_scanner_service, scanner_used_for='scan'):
     """
     Creates a set of scanners.
 
@@ -138,7 +138,7 @@ def create_scanners(
     :param scanner_used_for: `used_for` attribute value of the scanners.
     """
     for i in range(1, num_scanners + 1):
-        host = f'{scanner_host_prefix}_{i}' if remote_scanner_service is None \
+        host = f'{scanner_host_prefix}_{i}' if remote_scanner_service == '' \
                 else f'{scanner_host_prefix}_{i}.{remote_scanner_service}'
         result = client.create_scanner(
             name=f'{scanner_name_prefix}_{i}',
@@ -397,9 +397,11 @@ def initialise_scan(client: GMPClient):
 
     num_scanners = config.getint('SCAN', 'num_scanners')
     scanner_name_prefix = config['SCAN']['scanner_name_prefix']
+    remote_scanner_service = config['SCAN']['remote_scanner_service']
     scanner_host_prefix = config['SCAN']['scanner_host_prefix']
     create_scanners(
-        client, num_scanners, scanner_name_prefix, scanner_host_prefix, scanner_credential)
+        client, num_scanners, scanner_name_prefix,
+        scanner_host_prefix, remote_scanner_service, scanner_credential)
 
 
 def run_discovery(client: GMPClient, sqlite_conn, pg_conn, hosts):
