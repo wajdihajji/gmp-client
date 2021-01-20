@@ -65,7 +65,7 @@ def create_pg_conn(
     conn = None
     try:
         conn = psycopg2.connect(
-            host=host, database=database, user=database, password=password, port=port)
+            host=host, database=database, user=user, password=password, port=port)
     except (Exception, psycopg2.DatabaseError) as error:
         logging.error(error)
 
