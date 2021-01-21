@@ -149,13 +149,12 @@ def create_scanners(
 
 
 def delete_scanners(
-        client: GMPClient, num_scanners, scanner_name_prefix,
-        scanner_used_for='scan', ultimate=True):
+        client: GMPClient, num_scanners, scanner_name_prefix, ultimate=True):
     """
     Deletes a set of scanners.
 
     :param num_scanners: name of scanners to delete.
-    :param scanner_used_for: `used_for` attribute value of the scanners.
+    :param scanner_name_prefix: used to form the scanner name.
     :param ultimate: move to trash or delete permanently.
     """
     for i in range(1, num_scanners + 1):
