@@ -482,8 +482,9 @@ def run_scan(client: GMPClient, db_conn, pg_conn, hosts):
 
     assign_targets(client)
 
-    scanner_used_for = None if config['SCAN']['scanner_used_for'] == '' else config['SCAN']['scanner_used_for']
-    assign_tasks(client, scanner_used_for=scanner_used_for)
+    scanner_used_for = config['SCAN']['scanner_used_for']
+    used_for_values = None if scanner_used_for == '' else [attr.strip() for attr in scanner_used_for.split(',')]
+    assign_tasks(client, scanner_used_for=used_for_values)
 
     start_tasks(client)
 
