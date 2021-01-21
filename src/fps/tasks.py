@@ -479,13 +479,21 @@ def run_scan(client: GMPClient, db_conn, pg_conn, hosts):
 
     targets = create_targets(client, num_hosts_per_target, hosts, port_list)
     create_tasks(client, len(targets), **default_task_config)
+
     assign_targets(client)
-    assign_tasks(client)
+
+    scanner_used_for = None if config['SCAN']['scanner_used_for'] == '' else config['SCAN']['scanner_used_for']
+    assign_tasks(client, scanner_used_for=scanner_used_for)
+
     start_tasks(client)
+
     check_task_completion(client)
+
     results = get_results(client)
     export_results(pg_conn, results)
     scanned_hosts = list(set([result.xpath('host/text()')[0] for result in results]))
+
     update_discovered_hosts(db_conn, scanned_hosts, False)
+
     delete_tasks(client, ultimate=True)
     delete_targets(client)
