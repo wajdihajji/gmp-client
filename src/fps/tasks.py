@@ -138,14 +138,14 @@ def create_scanners(
     :param scanner_used_for: `used_for` attribute value of the scanners.
     """
     for i in range(1, num_scanners + 1):
-        host = f'{scanner_host_prefix}_{i}' if scanner_service == '' \
-                else f'{scanner_host_prefix}_{i}.{scanner_service}'
+        host = f'{scanner_host_prefix}-{i}' if scanner_service == '' \
+                else f'{scanner_host_prefix}-{i}.{scanner_service}'
         result = client.create_scanner(
-            name=f'{scanner_name_prefix}_{i}',
+            name=f'{scanner_name_prefix}-{i}',
             host=host,
             credential=credential,
             comment='' if scanner_used_for == '' else f'used_for:{scanner_used_for}')
-        logging.info('Create scanner %s: %s', f'{scanner_name_prefix}_{i}', result.get('status_text'))
+        logging.info('Create scanner %s: %s', f'{scanner_name_prefix}-{i}', result.get('status_text'))
 
 
 def delete_scanners(
@@ -158,8 +158,8 @@ def delete_scanners(
     :param ultimate: move to trash or delete permanently.
     """
     for i in range(1, num_scanners + 1):
-        result = client.delete_scanner(name=f'{scanner_name_prefix}_{i}', ultimate=ultimate)
-        logging.info('Delete scanner %s: %s', f'{scanner_name_prefix}_{i}', result.get('status_text'))
+        result = client.delete_scanner(name=f'{scanner_name_prefix}-{i}', ultimate=ultimate)
+        logging.info('Delete scanner %s: %s', f'{scanner_name_prefix}-{i}', result.get('status_text'))
 
 
 def assign_targets(
