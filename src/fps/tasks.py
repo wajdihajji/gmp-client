@@ -130,7 +130,7 @@ def delete_targets(client: GMPClient, target_name=None, states=['scanned'], ulti
 
 def create_scanners(
         client: GMPClient, num_scanners, scanner_name_prefix, scanner_host_prefix,
-        remote_scanner_service, credential, scanner_used_for='scan'):
+        scanner_service, credential, scanner_used_for='scan'):
     """
     Creates a set of scanners.
 
@@ -138,13 +138,13 @@ def create_scanners(
     :param scanner_used_for: `used_for` attribute value of the scanners.
     """
     for i in range(1, num_scanners + 1):
-        host = f'{scanner_host_prefix}_{i}' if remote_scanner_service == '' \
-                else f'{scanner_host_prefix}_{i}.{remote_scanner_service}'
+        host = f'{scanner_host_prefix}_{i}' if scanner_service == '' \
+                else f'{scanner_host_prefix}_{i}.{scanner_service}'
         result = client.create_scanner(
             name=f'{scanner_name_prefix}_{i}',
             host=host,
             credential=credential,
-            comment=f'used_for:{scanner_used_for}')
+            comment='' if scanner_used_for == '' else f'used_for:{scanner_used_for}')
         logging.info('Create scanner %s: %s', f'{scanner_name_prefix}_{i}', result.get('status_text'))
 
 
@@ -294,7 +294,7 @@ def get_results(
     return results
 
 
-def active_tasks_per_scanner(client: GMPClient, scanner_name=None, scanner_used_for=['scan']):
+def active_tasks_per_scanner(client: GMPClient, scanner_name, scanner_used_for):
     """
     Returns a dictionary containing number of active tasks per scanner.
 
@@ -374,34 +374,46 @@ def initialise_discovery(client: GMPClient):
     name = config['DISCOVERY']['scanner_name']
     host = config['DISCOVERY']['scanner_host']
     used_for = config['DISCOVERY']['scanner_used_for']
+
     client.create_scanner(
-        name=name, host=host, credential=scanner_credential, comment=f'used_for:{used_for}')
+        name=name, host=host, credential=scanner_credential,
+        comment='' if used_for == '' else f'used_for:{used_for}')
 
 
 def initialise_scan(client: GMPClient):
     """Creates port list and `scan` scanners."""
     port_list = config['SCAN']['port_list']
     port_range = config['SCAN']['port_range']
-    default_target = config['SCAN']['default_target']
     client.create_port_list(name=port_list, port_range=port_range)
+
+    default_target = config['SCAN']['default_target']
     client.create_target(name=default_target, hosts=['0.0.0.0'], port_list_name=port_list)
+
+    default_scanner_credential = config['SCAN']['default_scanner_credential']
+    client.create_credential(name=default_scanner_credential)
+
+    default_scanner_name = config['SCAN']['default_scanner_name']
+    default_scanner_host = config['SCAN']['default_scanner_host']
+    default_scanner_used_for = config['SCAN']['default_scanner_used_for']
+
+    client.create_scanner(
+        name=default_scanner_name, host=default_scanner_host, credential=default_scanner_credential,
+        comment='' if default_scanner_used_for == '' else f'used_for:{default_scanner_used_for}')
+
+    num_scanners = config.getint('SCAN', 'num_scanners')
 
     scanner_credential = config['SCAN']['scanner_credential']
     client.create_credential(name=scanner_credential)
 
-    name = config['SCAN']['default_scanner_name']
-    host = config['SCAN']['default_scanner_host']
-    used_for = config['SCAN']['default_scanner_used_for']
-    client.create_scanner(
-        name=name, host=host, credential=scanner_credential, comment=f'used_for:{used_for}')
-
-    num_scanners = config.getint('SCAN', 'num_scanners')
     scanner_name_prefix = config['SCAN']['scanner_name_prefix']
-    remote_scanner_service = config['SCAN']['remote_scanner_service']
+    scanner_used_for = config['SCAN']['scanner_used_for']
     scanner_host_prefix = config['SCAN']['scanner_host_prefix']
+    scanner_service = config['SCAN']['scanner_service']
+
     create_scanners(
         client, num_scanners, scanner_name_prefix,
-        scanner_host_prefix, remote_scanner_service, scanner_credential)
+        scanner_host_prefix, scanner_service, scanner_credential,
+        scanner_used_for)
 
 
 def run_discovery(client: GMPClient, sqlite_conn, pg_conn, hosts):
