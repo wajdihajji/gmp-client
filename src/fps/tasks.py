@@ -19,6 +19,11 @@ def create_comment(key, values):
     return '' if values is None else ' '.join([f'comment="{key}:{value}"' for value in values])
 
 
+def scan_or_discovery(task_name):
+    """Determines if a task was created for discovery or scan."""
+    return 'discovery' if task_name == config['DISCOVERY']['task_name'] else 'scan'
+
+
 def create_tasks(
         client: GMPClient, number_of_tasks, config_name,
         target_name, scanner_name, preferences, state='initialised'):
@@ -273,9 +278,10 @@ def get_results(
         task_id = client.get_task_id(name=task_name)
         task_target = task.xpath('target/name/text()')[0]
         report_id = task.xpath('last_report/report')[0].get('id')
-
         task_results = client.get_results(
             filter=f'rows=-1 report_id={report_id} task_id={task_id}')
+
+        logging.info(f'{len(task_results)} results returned by task {task_name}')
 
         results.extend(task_results)
 
@@ -354,9 +360,17 @@ def check_task_completion(
         if state is not None:
             client.update_task_state(name=task_name, state=state)
 
-        logging.info(
-            'Check task %s: %s | Progress: %s | Severity: %s | ERROR: "%s"',
-            task_name, task_status, task_progress, last_report_severity, error)
+        status_msg = (
+            f'Task: {task_name} | Status: {task_status} | '
+            f'Progress: {task_progress} | Severity: {last_report_severity} | ERROR: "{error}"'
+        )
+
+        if state == 'failed':
+            logging.error(status_msg)
+        elif state == 'stopped':
+            logging.warning(status_msg)
+        else:
+            logging.info(status_msg)
 
 
 def initialise_discovery(client: GMPClient):
