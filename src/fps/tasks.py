@@ -78,13 +78,11 @@ def create_targets(
 
 
 def delete_tasks(
-        client: GMPClient, task_name=None, task_config=None,
-        states=['obsolete'], ultimate=False):
+        client: GMPClient, task_name=None, states=['obsolete'], ultimate=False):
     """
     Deletes a set of tasks.
 
     :param task_name: name of the task to delete.
-    :param task_config: the tasks having `task_config` will be deleted.
     :param states: the tasks in `states` will be deleted.
     :param ultimate: move to trash or delete permanently.
     :return: list of deleted tasks.
@@ -94,7 +92,7 @@ def delete_tasks(
     _filter = f'rows=-1 {state_filter}' if task_name is None else f'rows=-1 name={task_name} and {state_filter}'
 
     deleted_tasks = []
-    for task in client.get_tasks(task_config=task_config, filter=_filter):
+    for task in client.get_tasks(filter=_filter):
         _task_name = task.xpath('name/text()')[0]
         result = client.delete_task(name=_task_name, ultimate=ultimate)
         logging.info('Deleted task %s: %s', _task_name, result.get('status_text'))
@@ -165,7 +163,7 @@ def delete_scanners(
 
 
 def assign_targets(
-        client: GMPClient,  target_name=None, task_name=None, task_config=None,
+        client: GMPClient,  target_name=None, task_name=None,
         target_states=['unassigned'], task_states=['initialised'],
         next_target_state='assigned', next_task_state='has_target'):
     """
@@ -173,7 +171,6 @@ def assign_targets(
 
     :param target_name: name of target to assign.
     :param task_name: name of task to accept targets.
-    :param task_config: tasks with `task_config` can accept targets.
     :param target_states: targets in `target_states` will be assigned.
     :param task_states: tasks in `task_states` can accept targets.
     :param next_target_state: Next target state.
@@ -187,7 +184,7 @@ def assign_targets(
     task_filter = f'rows=-1 {task_state_filter}' \
         if task_name is None else f'rows=-1 name={task_name} and {task_state_filter}'
 
-    tasks = client.get_tasks(task_config=task_config, filter=task_filter)
+    tasks = client.get_tasks(filter=task_filter)
 
     for target in client.get_targets(filter=target_filter):
         target_name = target.xpath('name/text()')[0]
@@ -203,8 +200,8 @@ def assign_targets(
 
 
 def assign_tasks(
-        client: GMPClient, task_name=None, task_config=None, scanner_name=None,
-        task_states=['has_target'], scanner_used_for=['scan'], next_task_state='has_scanner'):
+        client: GMPClient, task_name=None, scanner_name=None,
+        task_states=['has_target'], next_task_state='has_scanner'):
     """
     Assign tasks to scanners.
 
@@ -227,7 +224,7 @@ def assign_tasks(
     state_filter = create_comment('state', task_states)
     _filter = f'rows=-1 {state_filter}' if task_name is None else f'rows=-1 name={task_name} and {state_filter}'
 
-    for task in client.get_tasks(task_config=task_config, filter=_filter):
+    for task in client.get_tasks(filter=_filter):
         task_name = task.xpath('name/text()')[0]
         scanner_name = get_key_by_value(active_tasks_per_scanner_dict, 0)
         if scanner_name is None:
@@ -240,20 +237,20 @@ def assign_tasks(
 
 
 def start_tasks(
-        client: GMPClient, task_name=None, task_config=None,
+        client: GMPClient, task_name=None,
         states=['has_scanner'], next_task_state='started'):
     """
     Starts a set of tasks.
 
     :param task_name: name of the task to start.
-    :param task_config: the tasks having `task_config` will be started.
     :param states: the tasks in `states` will be started.
+    :param next_task_state: if task is started, assign it `next_task_state`.
     """
     state_filter = create_comment('state', states)
 
     _filter = f'rows=-1 {state_filter}' if task_name is None else f'rows=-1 name={task_name} and {state_filter}'
 
-    for task in client.get_tasks(task_config=task_config, filter=_filter):
+    for task in client.get_tasks(filter=_filter):
         task_name = task.xpath('name/text()')[0]
         result = client.start_task(name=task_name)
         logging.info('Starting task %s: %s', task_name, result.get('status_text'))
@@ -261,13 +258,12 @@ def start_tasks(
 
 
 def get_results(
-        client: GMPClient, task_name=None, task_config=None, task_states=['finished'],
+        client: GMPClient, task_name=None, task_states=['finished'],
         next_task_state='obsolete', next_target_state='scanned'):
     """
     Returns results in the last reports generated for each task in a task set.
 
     :param task_name: name of the task from which to get the scanned hosts.
-    :param task_config: get scanned hosts from the tasks having `task_config`.
     :param task_states: get results from the tasks in state`states`.
     :param next_task_state: next state of the task.
     :param next_target_state: next state of the target.
@@ -278,7 +274,7 @@ def get_results(
     state_filter = create_comment('state', task_states)
     _filter = f'rows=-1 {state_filter}' if task_name is None else f'rows=-1 name={task_name} and {state_filter}'
 
-    for task in client.get_tasks(task_config=task_config, filter=_filter):
+    for task in client.get_tasks(filter=_filter):
         task_name = task.xpath('name/text()')[0]
         task_id = client.get_task_id(name=task_name)
         task_target = task.xpath('target/name/text()')[0]
@@ -325,20 +321,22 @@ def active_tasks_per_scanner(client: GMPClient, scanner_name, scanner_used_for):
 
 
 def check_task_completion(
-        client: GMPClient, task_name=None, task_config=None, states=['started'],
+        client: GMPClient, task_name=None, states=['started'],
         task_finished_state='finished', task_failed_state='failed', task_stopped_state='stopped'):
     """
     Checks tasks completion status.
 
     :param task_name: name of the task to check its status.
-    :param task_config: the tasks having `task_config` will be checked.
-    :param states: the tasks in `states` will be checked.
+    :param states: check tasks with a state in states.
+    :param task_finished_state: state of finished tasks.
+    :param task_failed_state: state of failed tasks.
+    :param task_stopped_state: state of stopped tasks.
     """
     state_filter = create_comment('state', states)
 
     _filter = f'rows=-1 {state_filter}' if task_name is None else f'rows=-1 name={task_name} and {state_filter}'
 
-    for task in client.get_tasks(task_config=task_config, filter=_filter):
+    for task in client.get_tasks(filter=_filter):
         task_name = task.xpath('name/text()')[0]
         task_status = task.xpath('status/text()')[0]
         task_progress = task.xpath('progress/text()')[0]
