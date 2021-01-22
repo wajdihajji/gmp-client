@@ -157,9 +157,9 @@ def delete_scanners(
     :param scanner_name_prefix: used to form the scanner name.
     :param ultimate: move to trash or delete permanently.
     """
-    for i in range(1, num_scanners + 1):
-        result = client.delete_scanner(name=f'{scanner_name_prefix}-{i}', ultimate=ultimate)
-        logging.info('Delete scanner %s: %s', f'{scanner_name_prefix}-{i}', result.get('status_text'))
+    for i in range(num_scanners):
+        result = client.delete_scanner(name=f'{scanner_name_prefix}{i}', ultimate=ultimate)
+        logging.info('Delete scanner %s: %s', f'{scanner_name_prefix}{i}', result.get('status_text'))
 
 
 def assign_targets(
