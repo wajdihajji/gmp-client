@@ -205,21 +205,15 @@ def assign_tasks(
     """
     Assign tasks to scanners.
 
-    Only scanners with zero active tasks will be able to accept new tasks.
+    Only scanners with zero active tasks will accept new tasks.
 
     :param task_name: name of task to assign to scanner.
-    :param task_config: tasks with `task_config` will be assigned to scanners.
     :param scanner_name: scanners with name `scanner_name` will be added to scanners' filter.
     :param task_states: tasks in `task_states` will be assigned to scanners.
-    :param scanner_used_for: scanners having `used_for` set to `scanner_used_for` can accept tasks.
     :param next_task_state: Next task state.
-    :return: `None` if no scanners available.
+    :return: `None` if no scanner is available.
     """
-    active_tasks_per_scanner_dict = active_tasks_per_scanner(client, scanner_name, scanner_used_for)
-
-    if len(active_tasks_per_scanner_dict) == 0:
-        logging.warn('No scanners found with used_for attribute set to: %s', scanner_used_for)
-        return None
+    active_tasks_per_scanner_dict = active_tasks_per_scanner(client, scanner_name)
 
     state_filter = create_comment('state', task_states)
     _filter = f'rows=-1 {state_filter}' if task_name is None else f'rows=-1 name={task_name} and {state_filter}'
@@ -291,27 +285,31 @@ def get_results(
     return results
 
 
-def active_tasks_per_scanner(client: GMPClient, scanner_name, scanner_used_for):
+def active_tasks_per_scanner(
+        client: GMPClient, scanner_name=None,
+        scanner_name_prefix=config['SCAN']['scanner_name_prefix'],
+        num_scanners=config.getint('SCAN', 'num_scanners')):
     """
     Returns a dictionary containing number of active tasks per scanner.
 
     `active` tasks are those in status `Requested` or `Running` or  `Stop Requested`.
 
-    :param scanner_name: consider scanner with `scanner_name`.
-    :param scanner_used_for: consider scanners with `used_for` attribute set to `scanner_used_for`.
+    :param scanner_name: if provided only consider scanner with `scanner_name`.
+    :param scanner_name_prefix: check scanners with passed prefix.
+    :param num_scanners: number of scanners to check.
     :return: dictionary.
     """
-    # It has turned out that get_scanners(details=True) is very time-consuming.
+    # It has turned out that get_scanners(details=True) is very time consuming.
     # So falling back into doing it the classical way.
-    used_for_filter = create_comment('used_for', scanner_used_for)
-
-    _filter = f'rows=-1 {used_for_filter}' if scanner_name is None \
-        else f'rows=-1 name={scanner_name} and {used_for_filter}'
-
     tasks_per_scanner_dict = {}
+
     # Initialise tasks_per_scanner_dict
-    for scanner in client.get_scanners(filter=_filter):
-        tasks_per_scanner_dict[scanner.xpath('name/text()')[0]] = 0
+    # Assuming scanners with `scanner_name` or `{scanner_name_prefix}{i}` exist.
+    if scanner_name is None:
+        for i in range(num_scanners):
+            tasks_per_scanner_dict[f'{scanner_name_prefix}{i}'] = 0
+    else:
+        tasks_per_scanner_dict[scanner_name] = 0
 
     for task in client.get_tasks(filter='status="Requested" status="Running" status="Stop Requested"'):
         if task.xpath('scanner/name/text()')[0] in tasks_per_scanner_dict:
