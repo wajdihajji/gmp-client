@@ -62,14 +62,12 @@ def create_pg_conn(
         port=config['PROBING-DB']['port'],
         user=os.getenv('PG_USERNAME'), password=os.getenv('PG_PASSWORD')):
     """Creates a Postgres connection."""
-    conn = None
     try:
         conn = psycopg2.connect(
             host=host, database=database, user=user, password=password, port=port)
+        return conn
     except (Exception, psycopg2.DatabaseError) as error:
         logging.error(error)
-
-    return conn
 
 
 def create_sqlite_conn(db_file=config['INTERNAL-DB']['sqlite_file']):
@@ -79,13 +77,11 @@ def create_sqlite_conn(db_file=config['INTERNAL-DB']['sqlite_file']):
     :param db_file: database file.
     :return: Connection object or `None`.
     """
-    conn = None
     try:
         conn = sqlite3.connect(db_file)
+        return conn
     except sqlite3.Error as error:
         logging.error(error)
-
-    return conn
 
 
 def create_hosts_table(conn):
@@ -366,10 +362,9 @@ def insert_host(conn, host):
         cur = conn.cursor()
         cur.execute(sql, host)
         conn.commit()
+        return cur.lastrowid
     except sqlite3.Error as error:
         logging.error(error)
-
-    return cur.lastrowid
 
 
 def update_host_attribute(conn, attribute, value, ip_address, scan_day=datetime.today().isoweekday()):
@@ -379,10 +374,9 @@ def update_host_attribute(conn, attribute, value, ip_address, scan_day=datetime.
         cur = conn.cursor()
         cur.execute(sql, (value, ip_address, scan_day))
         conn.commit()
+        return cur.lastrowid
     except sqlite3.Error as error:
         logging.error(error)
-
-    return cur.lastrowid
 
 
 def initialise_host_attribute(conn, attribute, value, scan_day=datetime.today().isoweekday()):
@@ -392,10 +386,9 @@ def initialise_host_attribute(conn, attribute, value, scan_day=datetime.today().
         cur = conn.cursor()
         cur.execute(sql, (value, scan_day))
         conn.commit()
+        return cur.lastrowid
     except sqlite3.Error as error:
         logging.error(error)
-
-    return cur.lastrowid
 
 
 def import_hosts(sqlite_conn, pg_conn, day_id=datetime.today().isoweekday()):
@@ -444,6 +437,7 @@ def get_hosts(
         conn, selected_for_discovery, seen_up, selected_for_scan,
         scanned, scan_day=datetime.today().isoweekday(), num_records=None):
     """Returns the hosts where `attribute` equals `value` and having highest scan_priority."""
+    rows = None
     try:
         sql = (f'select ip_address, scan_priority from hosts '
                f'where selected_for_discovery in ({",".join(str(val) for val in selected_for_discovery)}) '
@@ -455,17 +449,18 @@ def get_hosts(
                f'{"" if num_records is None else " limit " + str(num_records)}')
         cur = conn.cursor()
         cur.execute(sql)
+        rows = cur.fetchall()
     except sqlite3.Error as error:
         logging.error(error)
 
-    rows = cur.fetchall()
+    hosts_high_priority = [row[0] for row in rows if rows is not None and row[1] == rows[0][1]]
 
-    hosts_high_priority = [row[0] for row in rows if row[1] == rows[0][1]]
+    scan_type = 'discovery' if seen_up == [0] else 'scan'
 
-    log_msg = 'No hosts found for scan/discovery'
+    log_msg = f'No hosts found for {scan_type}'
 
     if len(hosts_high_priority) > 0:
-        log_msg = f'Returns {len(hosts_high_priority)} hosts for scan/discovery with priority {rows[0][1]}'
+        log_msg = f'Returns {len(hosts_high_priority)} hosts for {scan_type} with priority {rows[0][1]}'
 
     logging.info(log_msg)
 
@@ -486,11 +481,10 @@ def get_hosts_count(
                f'and scan_day = "{scan_day}"')
         cur = conn.cursor()
         cur.execute(sql)
+        value = cur.fetchone()
+        return value[0]
     except sqlite3.Error as error:
         logging.error(error)
-
-    value = cur.fetchone()
-    return value[0]
 
 
 def update_discovered_hosts(conn, discovered_hosts, is_discovery=True):
