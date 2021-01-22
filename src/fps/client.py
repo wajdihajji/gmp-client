@@ -194,22 +194,6 @@ class GMPClient(object):
             credential_id=credential_id, ca_pub=ca_pub, **kwargs)
 
     @authenticate
-    def update_scanner_used_for(self, gmp, name, used_for):
-        """
-        Creates scanner's comment field.
-
-        :param name: scanner name.
-        :param used_for: value of `used_for` attribute.
-        :return: `None` if scanner does not exist, otherwise, `modify_scanner`'s result.
-        """
-        scanner_id = self.get_scanner_id(name=name)
-        if scanner_id is None:
-            logging.info('Scanner %s does not exist', name)
-            return {'status_text': 'Scanner does not exist'}
-
-        return gmp.modify_scanner(scanner_id=scanner_id, comment=f'used_for:{used_for}')
-
-    @authenticate
     def delete_scanner(self, gmp, name, ultimate=False):
         """
         Deletes a scanner.

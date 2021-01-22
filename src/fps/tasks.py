@@ -129,23 +129,25 @@ def delete_targets(client: GMPClient, target_name=None, states=['scanned'], ulti
 
 
 def create_scanners(
-        client: GMPClient, num_scanners, scanner_name_prefix, scanner_host_prefix,
-        scanner_service, credential, scanner_used_for='scan'):
+        client: GMPClient, num_scanners, scanner_name_prefix,
+        scanner_host_prefix, scanner_service, credential):
     """
     Creates a set of scanners.
 
-    :param num_scanners: name of scanners to create.
-    :param scanner_used_for: `used_for` attribute value of the scanners.
+    :param num_scanners: number of the scanners to create.
+    :param scanner_name_prefix: name prefix of the scanners to create.
+    :param scanner_host_prefix: scanner host prefix of the scanners to create
+    :param scanner_service: scanner service name, this is particular to statfulset pods.
+    :param credential: credential to be used by the scanner to connect to GVMd.
     """
-    for i in range(1, num_scanners + 1):
-        host = f'{scanner_host_prefix}-{i}' if scanner_service == '' \
-                else f'{scanner_host_prefix}-{i}.{scanner_service}'
+    for i in range(num_scanners):
+        host = f'{scanner_host_prefix}{i}' if scanner_service == '' \
+                else f'{scanner_host_prefix}{i}.{scanner_service}'
         result = client.create_scanner(
-            name=f'{scanner_name_prefix}-{i}',
+            name=f'{scanner_name_prefix}{i}',
             host=host,
-            credential=credential,
-            comment='' if scanner_used_for == '' else f'used_for:{scanner_used_for}')
-        logging.info('Create scanner %s: %s', f'{scanner_name_prefix}-{i}', result.get('status_text'))
+            credential=credential)
+        logging.info('Create scanner %s: %s', f'{scanner_name_prefix}{i}', result.get('status_text'))
 
 
 def delete_scanners(
@@ -372,11 +374,8 @@ def initialise_discovery(client: GMPClient):
 
     name = config['DISCOVERY']['scanner_name']
     host = config['DISCOVERY']['scanner_host']
-    used_for = config['DISCOVERY']['scanner_used_for']
 
-    client.create_scanner(
-        name=name, host=host, credential=scanner_credential,
-        comment='' if used_for == '' else f'used_for:{used_for}')
+    client.create_scanner(name=name, host=host, credential=scanner_credential)
 
 
 def initialise_scan(client: GMPClient):
@@ -393,11 +392,9 @@ def initialise_scan(client: GMPClient):
 
     default_scanner_name = config['SCAN']['default_scanner_name']
     default_scanner_host = config['SCAN']['default_scanner_host']
-    default_scanner_used_for = config['SCAN']['default_scanner_used_for']
 
     client.create_scanner(
-        name=default_scanner_name, host=default_scanner_host, credential=default_scanner_credential,
-        comment='' if default_scanner_used_for == '' else f'used_for:{default_scanner_used_for}')
+        name=default_scanner_name, host=default_scanner_host, credential=default_scanner_credential)
 
     num_scanners = config.getint('SCAN', 'num_scanners')
 
@@ -405,14 +402,12 @@ def initialise_scan(client: GMPClient):
     client.create_credential(name=scanner_credential)
 
     scanner_name_prefix = config['SCAN']['scanner_name_prefix']
-    scanner_used_for = config['SCAN']['scanner_used_for']
     scanner_host_prefix = config['SCAN']['scanner_host_prefix']
     scanner_service = config['SCAN']['scanner_service']
 
     create_scanners(
         client, num_scanners, scanner_name_prefix,
-        scanner_host_prefix, scanner_service, scanner_credential,
-        scanner_used_for)
+        scanner_host_prefix, scanner_service, scanner_credential)
 
 
 def run_discovery(client: GMPClient, sqlite_conn, pg_conn, hosts):
@@ -482,9 +477,7 @@ def run_scan(client: GMPClient, db_conn, pg_conn, hosts):
 
     assign_targets(client)
 
-    scanner_used_for = config['SCAN']['scanner_used_for']
-    used_for_values = None if scanner_used_for == '' else [attr.strip() for attr in scanner_used_for.split(',')]
-    assign_tasks(client, scanner_used_for=used_for_values)
+    assign_tasks(client)
 
     start_tasks(client)
 
