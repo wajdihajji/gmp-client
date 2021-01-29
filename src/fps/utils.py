@@ -230,13 +230,15 @@ def update_report_date_delete(conn, date_delete, ipaddr, nid):
 def create_report(result, portdesc_dict):
     """Creates a report from a result object."""
     creation_time = result.xpath('creation_time/text()')[0]
-    port = result.xpath('port/text()')[0]
+    _port = result.xpath('port/text()')[0]  # like 19/tcp or general/tcp
     ip_address = result.xpath('host/text()')[0]
     nvt_oid = result.xpath('nvt')[0].get('oid')
     tags = result.xpath('nvt/tags/text()')[0]
     severity = result.xpath('severity/text()')[0]
     nvt_name = result.xpath('nvt/name/text()')[0]
     cvss = result.xpath('nvt/cvss_base/text()')[0]
+
+    port = 'general-ip' if _port.split('/')[0] == 'general' else _port.replace('/', '-')
 
     portdesc = get_portdesc(portdesc_dict, port)
 
