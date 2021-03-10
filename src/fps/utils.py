@@ -384,11 +384,10 @@ def update_host_attribute(conn, attribute, value, ip_address, scan_day=datetime.
 def del_hosts_by_day(conn, scan_day=datetime.today().isoweekday() + 1):
     """Delete hosts scheduled to scan on day `scan_day`."""
     try:
-        sql = f'delete from hosts where scan_day = ?'
+        sql = f'delete from hosts where scan_day = {scan_day}'
         cur = conn.cursor()
-        cur.execute(sql, (scan_day))
+        cur.execute(sql)
         conn.commit()
-        return cur.lastrowid
     except sqlite3.Error as error:
         logging.error(error)
 
