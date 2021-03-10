@@ -10,10 +10,9 @@ import schedule
 
 from fps.client import GMPClient
 from fps.tasks import (initialise_discovery, initialise_scan, run_discovery,
-                       run_scan, update_host_attribute)
+                       run_scan)
 from fps.utils import (create_hosts_table, create_pg_conn, create_sqlite_conn,
-                       del_hosts_by_day, get_hosts, import_hosts,
-                       populate_hosts_table)
+                       del_hosts_by_day, import_hosts, populate_hosts_table)
 
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
 
@@ -39,13 +38,9 @@ def job_populate_hosts_table(sqlite_conn):
 
 
 @with_logging
-def job_run_discovery(gmp_client, sqlite_conn, pg_conn):
+def job_run_discovery(gmp_client, sqlite_conn):
     """Runs host discovery."""
-    # Get the hosts that have not been selected for discovery or seen up,
-    # not selected for scan and not yet scanned.
-    sub_hosts = get_hosts(
-        sqlite_conn, [0], [0], [0], [0], num_records=config.getint('DISCOVERY', 'max_num_hosts'))
-    run_discovery(gmp_client, sqlite_conn, pg_conn, sub_hosts)
+    run_discovery(gmp_client, sqlite_conn)
 
 
 @with_logging
@@ -60,12 +55,7 @@ def job_import_hosts(sqlite_conn, pg_conn):
 @with_logging
 def job_run_scan(gmp_client, sqlite_conn, pg_conn):
     """Runs scan."""
-    # Get the hosts that have been seen up, not selected for scan and not yet scanned.
-    sub_hosts = get_hosts(
-        sqlite_conn, [0, 1], [1], [0], [0], num_records=config.getint('SCAN', 'max_num_hosts'))
-    for host in sub_hosts:
-        update_host_attribute(sqlite_conn, 'selected_for_scan', 1, host)
-    run_scan(gmp_client, sqlite_conn, pg_conn, sub_hosts)
+    run_scan(gmp_client, sqlite_conn, pg_conn)
 
 
 if __name__ == '__main__':
@@ -95,7 +85,7 @@ if __name__ == '__main__':
     del_hosts_by_day(sqlite_conn)
 
     # 6. start the first discovery task
-    job_run_discovery(gmp_client, sqlite_conn, pg_conn)
+    job_run_discovery(gmp_client, sqlite_conn)
 
     # Scheduled steps:
     # 1. import hosts every `import_hosts_freq` minutes
@@ -104,7 +94,7 @@ if __name__ == '__main__':
 
     # 2. run job_run_discovery every `discovery_freq` minutes
     schedule.every(discovery_freq).minutes.do(
-        job_run_discovery, gmp_client=gmp_client, sqlite_conn=sqlite_conn, pg_conn=pg_conn)
+        job_run_discovery, gmp_client=gmp_client, sqlite_conn=sqlite_conn)
 
     # 3. run job_run_scan every `scan_freq` minutes
     schedule.every(scan_freq).minutes.do(

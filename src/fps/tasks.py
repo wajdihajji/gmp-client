@@ -6,7 +6,7 @@ import logging
 import uuid
 
 from fps.client import GMPClient
-from fps.utils import (export_results, get_key_by_value,
+from fps.utils import (export_results, get_hosts, get_key_by_value,
                        reset_discovery_attribute, update_discovered_hosts,
                        update_host_attribute)
 
@@ -420,7 +420,7 @@ def initialise_scan(client: GMPClient):
         scanner_host_prefix, scanner_service, scanner_credential)
 
 
-def run_discovery(client: GMPClient, sqlite_conn, pg_conn, hosts):
+def run_discovery(client: GMPClient, sqlite_conn):
     """Runs discovery task."""
     discovery_task = config['DISCOVERY']['task_name']
     discovery_target = config['DISCOVERY']['target_name']
@@ -455,19 +455,24 @@ def run_discovery(client: GMPClient, sqlite_conn, pg_conn, hosts):
             discovery_task in deleted_tasks and discovery_target in deleted_targets:
         reset_discovery_attribute(sqlite_conn)
 
+    # Get the hosts that have not been selected for discovery or seen up, and
+    # not selected for scan and not yet scanned.
+    sub_hosts = get_hosts(
+        sqlite_conn, [0], [0], [0], [0], num_records=config.getint('DISCOVERY', 'max_num_hosts'))
+
     result = client.create_target(
-        name=discovery_target, hosts=hosts, port_list_name=port_list, state='d/assigned')
+        name=discovery_target, hosts=sub_hosts, port_list_name=port_list, state='d/assigned')
 
     # If target has been created successfully
     if result.get('status') == '201':
         client.create_task(name=discovery_task, state='d/has_scanner', **task_config)
-        for host in hosts:
+        for host in sub_hosts:
             update_host_attribute(sqlite_conn, 'selected_for_discovery', 1, host)
 
     start_tasks(client, task_name=discovery_task, states=['d/has_scanner'], next_task_state='d/started')
 
 
-def run_scan(client: GMPClient, db_conn, pg_conn, hosts):
+def run_scan(client: GMPClient, db_conn, pg_conn):
     """Runs scan tasks."""
     scanner_name = config['SCAN']['default_scanner_name']
     default_target = config['SCAN']['default_target']
@@ -493,7 +498,13 @@ def run_scan(client: GMPClient, db_conn, pg_conn, hosts):
     delete_tasks(client, ultimate=True)
     delete_targets(client)
 
-    targets = create_targets(client, num_hosts_per_target, hosts, port_list)
+    # Get the hosts that have been seen up, not selected for scan and not yet scanned.
+    sub_hosts = get_hosts(
+        db_conn, [0, 1], [1], [0], [0], num_records=config.getint('SCAN', 'max_num_hosts'))
+    for host in sub_hosts:
+        update_host_attribute(db_conn, 'selected_for_scan', 1, host)
+
+    targets = create_targets(client, num_hosts_per_target, sub_hosts, port_list)
     create_tasks(client, len(targets), **default_task_config)
 
     assign_targets(client)
