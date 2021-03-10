@@ -185,7 +185,7 @@ def severity_to_threat(severity):
 def insert_report(conn, report):
     """Inserts a new report."""
     try:
-        sql = '''INSERT INTO reports_test (
+        sql = '''INSERT INTO reports (
                  ipaddr, port, portdesc, nid, risk, severity,
                  synopsis, report, date_create, date_update)
                  values(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)'''
@@ -200,7 +200,7 @@ def insert_report(conn, report):
 def update_report(conn, report):
     """Updates an existing report."""
     try:
-        sql = '''update reports_test set
+        sql = '''update reports set
                  port = %s, portdesc = %s, risk = %s, severity = %s,
                  synopsis = %s, report = %s, date_update = %s
                  where ipaddr = %s and nid = %s and date_delete IS NULL'''
@@ -218,7 +218,7 @@ def update_report(conn, report):
 def update_report_date_delete(conn, date_delete, ipaddr, nid):
     """Updates report's `date_delete`."""
     try:
-        sql = 'update reports_test set date_delete = %s where ipaddr = %s and nid = %s'
+        sql = 'update reports set date_delete = %s where ipaddr = %s and nid = %s'
         cur = conn.cursor()
         cur.execute(sql, (date_delete, ipaddr, nid))
         conn.commit()
@@ -305,7 +305,7 @@ def export_results(conn, results):
     report_rows = []
     try:
         cur = conn.cursor()
-        cur.execute('select ipaddr, nid, date_create, date_update from reports_test where date_delete is null')
+        cur.execute('select ipaddr, nid, date_create, date_update from reports where date_delete is null')
         report_rows = cur.fetchall()
     except (Exception, psycopg2.DatabaseError) as error:
         logging.error(error)
