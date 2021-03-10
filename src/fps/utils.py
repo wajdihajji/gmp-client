@@ -381,6 +381,18 @@ def update_host_attribute(conn, attribute, value, ip_address, scan_day=datetime.
         logging.error(error)
 
 
+def del_hosts_by_day(conn, scan_day=datetime.today().isoweekday() + 1):
+    """Delete hosts scheduled to scan on day `scan_day`."""
+    try:
+        sql = f'delete from hosts where scan_day = ?'
+        cur = conn.cursor()
+        cur.execute(sql, (scan_day))
+        conn.commit()
+        return cur.lastrowid
+    except sqlite3.Error as error:
+        logging.error(error)
+
+
 def initialise_host_attribute(conn, attribute, value, scan_day=datetime.today().isoweekday()):
     """Initialises `attribute` to `value`."""
     try:
