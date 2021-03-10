@@ -434,17 +434,6 @@ def run_discovery(client: GMPClient, sqlite_conn, pg_conn, hosts):
                    'scanner_name': scanner_name,
                    'preferences': {'max_checks': max_checks, 'max_hosts': max_hosts}}
 
-    result = client.create_target(
-        name=discovery_target, hosts=hosts, port_list_name=port_list, state='d/assigned')
-
-    # If target has been created successfully
-    if result.get('status') == '201':
-        client.create_task(name=discovery_task, state='d/has_scanner', **task_config)
-        for host in hosts:
-            update_host_attribute(sqlite_conn, 'selected_for_discovery', 1, host)
-
-    start_tasks(client, task_name=discovery_task, states=['d/has_scanner'], next_task_state='d/started')
-
     check_task_completion(
         client, task_name=discovery_task, states=['d/started'],
         task_finished_state='d/finished', task_failed_state='d/failed', task_stopped_state='d/stopped')
@@ -465,6 +454,17 @@ def run_discovery(client: GMPClient, sqlite_conn, pg_conn, hosts):
     if config['DISCOVERY'].getboolean('rerun_discovery') and \
             discovery_task in deleted_tasks and discovery_target in deleted_targets:
         reset_discovery_attribute(sqlite_conn)
+
+    result = client.create_target(
+        name=discovery_target, hosts=hosts, port_list_name=port_list, state='d/assigned')
+
+    # If target has been created successfully
+    if result.get('status') == '201':
+        client.create_task(name=discovery_task, state='d/has_scanner', **task_config)
+        for host in hosts:
+            update_host_attribute(sqlite_conn, 'selected_for_discovery', 1, host)
+
+    start_tasks(client, task_name=discovery_task, states=['d/has_scanner'], next_task_state='d/started')
 
 
 def run_scan(client: GMPClient, db_conn, pg_conn, hosts):
