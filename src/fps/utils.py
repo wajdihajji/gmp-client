@@ -100,14 +100,13 @@ def create_hosts_table(conn):
 
 
 def reset_discovery_attribute(conn):
-    """Reset selected_for_discovery attribute to 0 when all hosts have it set to 1."""
+    """Set selected_for_discovery attribute to 0 if there are still hosts with seen_up=0"""
     try:
         cur = conn.cursor()
         cur.execute('''update hosts
                        set selected_for_discovery = 0
                        where
-                       (select count(*) from hosts) =
-                       (select count(*) from hosts where selected_for_discovery = 1)''')
+                       (select count(*) from hosts where seen_up = 0) > 0''')
         conn.commit()
     except sqlite3.Error as error:
         logging.error(error)
