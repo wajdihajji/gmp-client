@@ -103,11 +103,11 @@ if __name__ == '__main__':
         job_import_hosts, sqlite_conn=sqlite_conn, pg_conn=pg_conn)
 
     # 2. run job_run_discovery every `discovery_freq` minutes
-    schedule.every(10).seconds.do(
+    schedule.every(discovery_freq).minutes.do(
         job_run_discovery, gmp_client=gmp_client, sqlite_conn=sqlite_conn, pg_conn=pg_conn)
 
     # 3. run job_run_scan every `scan_freq` minutes
-    schedule.every(10).seconds.do(
+    schedule.every(scan_freq).minutes.do(
         job_run_scan, gmp_client=gmp_client, sqlite_conn=sqlite_conn, pg_conn=pg_conn)
 
     # 4. delete next day hosts at 11pm
