@@ -58,7 +58,7 @@ def get_key_by_value(dictionary, searched_value):
 
 
 def create_pg_conn(
-        host=config['PROBING-DB']['host'], database=config['PROBING-DB']['database'],
+        host=os.getenv('PG_HOST'), database=config['PROBING-DB']['database'],
         port=config['PROBING-DB']['port'],
         user=os.getenv('PG_USERNAME'), password=os.getenv('PG_PASSWORD')):
     """Creates a Postgres connection."""
