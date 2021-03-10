@@ -482,15 +482,6 @@ def run_scan(client: GMPClient, db_conn, pg_conn, hosts):
                            'scanner_name': scanner_name,
                            'preferences': {'max_checks': max_checks, 'max_hosts': max_hosts}}
 
-    targets = create_targets(client, num_hosts_per_target, hosts, port_list)
-    create_tasks(client, len(targets), **default_task_config)
-
-    assign_targets(client)
-
-    assign_tasks(client)
-
-    start_tasks(client)
-
     check_task_completion(client)
 
     results = get_results(client)
@@ -501,3 +492,12 @@ def run_scan(client: GMPClient, db_conn, pg_conn, hosts):
 
     delete_tasks(client, ultimate=True)
     delete_targets(client)
+
+    targets = create_targets(client, num_hosts_per_target, hosts, port_list)
+    create_tasks(client, len(targets), **default_task_config)
+
+    assign_targets(client)
+
+    assign_tasks(client)
+
+    start_tasks(client)
