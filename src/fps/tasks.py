@@ -449,8 +449,8 @@ def run_discovery(client: GMPClient, sqlite_conn):
     deleted_tasks = delete_tasks(client, task_name=discovery_task, ultimate=True, states=['d/obsolete'])
     deleted_targets = delete_targets(client, target_name=discovery_target, states=['d/scanned'])
 
-    # If discovery task and target have been deleted, and there are still hosts
-    # with seen_up = 0, and `rerun_discovery` config parameter is set to true,
+    # If discovery task completed, and all the hosts with seen_up = 0
+    # have been checked if alive, and `rerun_discovery` = true,
     # then set selected_for_discovery to 0
     if config['DISCOVERY'].getboolean('rerun_discovery') and \
             discovery_task in deleted_tasks and discovery_target in deleted_targets:
