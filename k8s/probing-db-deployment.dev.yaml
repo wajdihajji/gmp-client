@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: probing-db
+  name: probing-db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: probing-db
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: probing-db
+    spec:
+      containers:
+      - image: postgres
+        name: probing-db
+        env:
+        - name: PGDATA
+          value: /var/lib/postgresql/data
+        - name: POSTGRES_DB
+          value: probing
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: probing-db-secret
+              key: username
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: probing-db-secret
+              key: password
+        volumeMounts:
+        - mountPath: /var/lib/postgresql/data
+          subPath: probing
+          name: data-volume
+        resources:
+          limits:
+            cpu: "1"
+            memory: 1Gi
+          requests:
+            cpu: "100m"
+            memory: 1Gi
+      volumes:
+      - name: data-volume
+        # Assuming the volume claim already exists
+        persistentVolumeClaim:
+          claimName: data-volume

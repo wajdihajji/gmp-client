@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: gmp-client
+  name: gmp-client
+  namespace: gvm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gmp-client
+  template:
+    metadata:
+      labels:
+        app: gmp-client
+    spec:
+      containers:
+      - image: registry.gitlab.developers.cam.ac.uk/uis/infra/gmp-client:latest
+        name: gmp-client
+        imagePullPolicy: Always
+        command:
+        - sleep
+        - "604800"
+        env:
+        - name: GMP_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: gmp-client
+              key: username
+        - name: GMP_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: gmp-client
+              key: password
+        - name: PG_HOST
+          valueFrom:
+            secretKeyRef:
+              name: probing-db
+              key: host
+        - name: PG_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: probing-db
+              key: username
+        - name: PG_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: probing-db
+              key: password
+        volumeMounts:
+        - name: data-volume
+          subPath: gmp-client
+          mountPath: /usr/src/app/data
+        - name: data-volume
+          subPath: certs
+          mountPath: /certs
+        - name: gmp-client
+          subPath: config.ini
+          mountPath: /usr/src/app/config.ini
+        resources:
+          limits:
+            cpu: "1"
+            memory: 1Gi
+          requests:
+            cpu: "100m"
+            memory: 500Mi
+      volumes:
+      - name: data-volume
+        # Assuming the volume claim already exists
+        persistentVolumeClaim:
+          claimName: data-volume
+      - name: gmp-client
+        configMap:
+          name: gmp-client
