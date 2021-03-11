@@ -7,8 +7,8 @@ import uuid
 
 from fps.client import GMPClient
 from fps.utils import (export_results, get_hosts, get_key_by_value,
-                       reset_discovery_attribute, update_discovered_hosts,
-                       update_host_attribute)
+                       increment_host_attribute, reset_discovery_attribute,
+                       update_discovered_hosts, update_host_attribute)
 
 config = configparser.ConfigParser()
 config.read('config.ini')
@@ -469,8 +469,7 @@ def run_discovery(client: GMPClient, sqlite_conn):
         client.create_task(name=discovery_task, state='d/has_scanner', **task_config)
         for host in sub_hosts:
             update_host_attribute(sqlite_conn, 'selected_for_discovery', 1, host)
-            update_host_attribute(
-                sqlite_conn, 'discovery_count', 'discovery_count + 1', host)
+            increment_host_attribute(sqlite_conn, 'discovery_count', host)
 
     start_tasks(client, task_name=discovery_task, states=['d/has_scanner'], next_task_state='d/started')
 
