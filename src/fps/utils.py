@@ -383,7 +383,7 @@ def update_host_attribute(conn, attribute, value, ip_address, scan_day=datetime.
                    f'where ip_address = ? and scan_day = ?')
         else:
             sql = (f'update hosts set '
-                   f'{attribute} = ?, '
+                   f'{attribute} = ? '
                    f'where ip_address = ? and scan_day = ?')
         cur = conn.cursor()
         cur.execute(sql, (value, ip_address, scan_day))
