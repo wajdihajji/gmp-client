@@ -32,9 +32,34 @@ export PG_PASSWORD=quux
 ```
 
 ## Development
-Please consider the prerequisites in the section above before running the `docker-compose`
-file.
+To run the `docker-compose` file, please consider the prerequisites in the section above.
 
 ```bash
 docker-compose -f docker-compose.yml up -d
+```
+
+## Kubernetes deployment
+To run the GMP client in a k8s cluster, follow these instructions:
+
+1. Create a k8s secret, `probing-db`, for the Probing DB credentials.
+```bash
+kubectl create secret generic probing-db --from-literal=host=pg_host
+--from-literal=username=foo --from-literal=password=bar -n gvm
+```
+2. Create a k8s secret, `gmp-client`, for the GVMd credentials.
+```bash
+kubectl create secret generic gmp-client --from-literal=username=foo
+--from-literal=password=bar -n gvm
+```
+3. Create a k8s configmap, `gmp-client`, for the GMP client config.
+```bash
+kubectl create cm gmp-client --from-file=config.ini=./config.ini -n gvm
+```
+
+4. Make sure a persistent Volume Claim, `data-volume`,  is available for GMP client
+to access GVMd certs and store its data.
+
+4. Create the `gmp-client` k8s Deployment.
+```bash
+kubectl apply -f k8s/gmp-client-deployment.yaml
 ```
