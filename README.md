@@ -27,6 +27,7 @@ and should be provided as environment variables.
 ```env
 export GMP_USERNAME=foo
 export GMP_PASSWORD=bar
+export PG_HOST=host
 export PG_USERNAME=qux
 export PG_PASSWORD=quux
 ```
