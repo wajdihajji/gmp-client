@@ -375,21 +375,18 @@ def insert_host(conn, host):
 def update_host_attribute(conn, attribute, value, ip_address, scan_day=datetime.today().isoweekday()):
     """Set host's `attribute` to `value`."""
     try:
-        sql = f'update hosts set {attribute} = ? where ip_address = ? and scan_day = ?'
+        # if selected_for_discovery -> 1, increment discovery_count
+        if attribute == 'selected_for_discovery' and value == 1:
+            sql = (f'update hosts set '
+                   f'{attribute} = ?, '
+                   f'discovery_count = discovery_count + 1 '
+                   f'where ip_address = ? and scan_day = ?')
+        else:
+            sql = (f'update hosts set '
+                   f'{attribute} = ?, '
+                   f'where ip_address = ? and scan_day = ?')
         cur = conn.cursor()
         cur.execute(sql, (value, ip_address, scan_day))
-        conn.commit()
-        return cur.lastrowid
-    except sqlite3.Error as error:
-        logging.error(error)
-
-
-def increment_host_attribute(conn, attribute, ip_address, scan_day=datetime.today().isoweekday()):
-    """Increment host's `attribute`."""
-    try:
-        sql = f'update hosts set {attribute} = {attribute} + 1 where ip_address = ? and scan_day = ?'
-        cur = conn.cursor()
-        cur.execute(sql, (ip_address, scan_day))
         conn.commit()
         return cur.lastrowid
     except sqlite3.Error as error:
