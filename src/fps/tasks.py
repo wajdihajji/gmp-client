@@ -7,8 +7,8 @@ import uuid
 
 from fps.client import GMPClient
 from fps.utils import (export_results, get_hosts, get_key_by_value,
-                       increment_host_attribute, reset_discovery_attribute,
-                       update_discovered_hosts, update_host_attribute)
+                       reset_discovery_attribute, update_discovered_hosts,
+                       update_host_attribute)
 
 config = configparser.ConfigParser()
 config.read('config.ini')
