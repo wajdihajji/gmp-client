@@ -18,10 +18,6 @@ spec:
       containers:
       - image: registry.gitlab.developers.cam.ac.uk/uis/infra/gmp-client:latest
         name: gmp-client
-        imagePullPolicy: Always
-        command:
-        - sleep
-        - "604800"
         env:
         - name: GMP_USERNAME
           valueFrom:
