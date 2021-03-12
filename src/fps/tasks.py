@@ -365,7 +365,7 @@ def check_task_completion(
             f'Progress: {task_progress} | Severity: {last_report_severity} | ERROR: "{error}"'
         )
 
-        if state in ['failed', 'stopped']:
+        if state in ['d/failed', 'd/stopped', 'failed', 'stopped']:
             logging.error(status_msg)
         else:
             logging.info(status_msg)
