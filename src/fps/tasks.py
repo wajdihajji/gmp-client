@@ -275,11 +275,10 @@ def get_results(
 
     for task in client.get_tasks(filter=_filter):
         task_name = task.xpath('name/text()')[0]
-        task_id = client.get_task_id(name=task_name)
         task_target = task.xpath('target/name/text()')[0]
         report_id = task.xpath('last_report/report')[0].get('id')
-        task_results = client.get_results(
-            filter=f'rows=-1 report_id={report_id} task_id={task_id}')
+        report = client.get_report(report_id=report_id, details=1, ignore_pagination=1)
+        task_results = report[0].xpath('report/results/result')
 
         logging.info(f'{len(task_results)} results returned by task {task_name}')
 
