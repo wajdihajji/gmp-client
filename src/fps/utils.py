@@ -325,10 +325,12 @@ def export_results(conn, results):
     ips = set({})
     for result in results:
         nvt_oid = result.xpath('nvt')[0].get('oid')
+        ip_address = result.xpath('host/text()')[0]
         if nvt_oid in ['1.3.6.1.4.1.25623.1.0.999998', '1.3.6.1.4.1.25623.1.0.108560']:
+            logging.info(
+                'Result of IP address %s and NVT OID %s has been ignored.', ip_address, nvt_oid)
             continue
 
-        ip_address = result.xpath('host/text()')[0]
         ips |= {ip_address}
 
         key = f'{ip_address}-{nvt_oid}'
