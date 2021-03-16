@@ -44,13 +44,11 @@ To run the GMP client in a k8s cluster, follow these instructions:
 
 1. Create a k8s secret, `probing-db`, for the Probing DB credentials.
 ```bash
-kubectl create secret generic probing-db --from-literal=host=pg_host
---from-literal=username=foo --from-literal=password=bar -n gvm
+kubectl create secret generic probing-db --from-literal=host=pg_host --from-literal=username=foo --from-literal=password=bar -n gvm
 ```
 2. Create a k8s secret, `gmp-client`, for the GVMd credentials.
 ```bash
-kubectl create secret generic gmp-client --from-literal=username=foo
---from-literal=password=bar -n gvm
+kubectl create secret generic gmp-client --from-literal=username=foo --from-literal=password=bar -n gvm
 ```
 3. Create a k8s configmap, `gmp-client`, for the GMP client config.
 ```bash
