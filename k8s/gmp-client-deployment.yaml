@@ -16,7 +16,7 @@ spec:
         app: gmp-client
     spec:
       containers:
-      - image: registry.gitlab.developers.cam.ac.uk/uis/infra/gmp-client:latest
+      - image: registry.gitlab.developers.cam.ac.uk/uis/infra/fps/gmp-client:latest
         name: gmp-client
         env:
         - name: GMP_USERNAME
