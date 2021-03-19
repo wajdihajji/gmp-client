@@ -1,4 +1,4 @@
-FROM python:3.8
+FROM uisautomation/python:3.8-alpine
 
 # set the working directory in the container
 WORKDIR /usr/src/app
