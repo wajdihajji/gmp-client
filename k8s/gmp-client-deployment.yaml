@@ -46,9 +46,6 @@ spec:
               key: password
         volumeMounts:
         - name: data-volume
-          subPath: gmp-client
-          mountPath: /usr/src/app/data
-        - name: data-volume
           subPath: certs
           mountPath: /certs
         - name: gmp-client
