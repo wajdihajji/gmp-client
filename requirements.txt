@@ -1,4 +1,3 @@
-gvm-tools==20.10.1
-python-gvm==20.9.1
+python-gvm==21.1.3
 schedule
 psycopg2

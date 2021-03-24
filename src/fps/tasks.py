@@ -470,7 +470,7 @@ def run_discovery(client: GMPClient, sqlite_conn):
     start_tasks(client, task_name=discovery_task, states=['d/has_scanner'], next_task_state='d/started')
 
 
-def run_scan(client: GMPClient, db_conn, pg_conn):
+def run_scan(client: GMPClient, pg_conn):
     """Runs scan tasks."""
     scanner_name = config['SCAN']['default_scanner_name']
     default_target = config['SCAN']['default_target']
@@ -491,16 +491,16 @@ def run_scan(client: GMPClient, db_conn, pg_conn):
     export_results(pg_conn, results)
     scanned_hosts = list(set([result.xpath('host/text()')[0] for result in results]))
 
-    update_discovered_hosts(db_conn, scanned_hosts, False)
+    update_discovered_hosts(pg_conn, scanned_hosts, False)
 
     delete_tasks(client, ultimate=True)
     delete_targets(client)
 
     # Get the hosts that have been seen up, not selected for scan and not yet scanned.
     sub_hosts = get_hosts(
-        db_conn, [0, 1], [1], [0], [0], num_records=config.getint('SCAN', 'max_num_hosts'))
+        pg_conn, [0, 1], [1], [0], [0], num_records=config.getint('SCAN', 'max_num_hosts'))
     for host in sub_hosts:
-        update_host_attribute(db_conn, 'selected_for_scan', 1, host)
+        update_host_attribute(pg_conn, 'selected_for_scan', 1, host)
 
     targets = create_targets(client, num_hosts_per_target, sub_hosts, port_list)
     create_tasks(client, len(targets), **default_task_config)

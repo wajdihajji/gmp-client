@@ -1,6 +1,6 @@
 """
 Utils functions to:
-    - Manipulate `hosts` SQLite table.
+    - Updated database table `hosts`.
     - Generate random IP addresses for testing.
     - Dictionary-related operations.
 """
@@ -11,7 +11,6 @@ import logging
 import os
 import random
 import re
-import sqlite3
 from datetime import datetime
 
 import psycopg2
@@ -70,32 +69,18 @@ def create_pg_conn(
         logging.error(error)
 
 
-def create_sqlite_conn(db_file=config['INTERNAL-DB']['sqlite_file']):
-    """
-    Creates an SQLite database connection to the DB file `db_file`.
-
-    :param db_file: database file.
-    :return: Connection object or `None`.
-    """
-    try:
-        conn = sqlite3.connect(db_file)
-        return conn
-    except sqlite3.Error as error:
-        logging.error(error)
-
-
 def create_hosts_table(conn):
     """Creates `hosts` table."""
     try:
         cur = conn.cursor()
         cur.execute('''create table if not exists hosts
                     (scan_day integer, ip_address text, netmask text,
-                    selected_for_discovery integer default 0, discovery_count interger default 0,
+                    selected_for_discovery integer default 0, discovery_count integer default 0,
                     seen_up integer default 0, selected_for_scan integer default 0,
                     scanned integer default 0, scan_priority integer default 3,
                     PRIMARY KEY (scan_day, ip_address))''')
         conn.commit()
-    except sqlite3.Error as error:
+    except (Exception, psycopg2.DatabaseError) as error:
         logging.error(error)
 
 
@@ -112,7 +97,7 @@ def reset_discovery_attribute(conn):
                        (select count(*) from hosts where seen_up = 0 and selected_for_discovery = 0) = 0
                        ''')
         conn.commit()
-    except sqlite3.Error as error:
+    except (Exception, psycopg2.DatabaseError) as error:
         logging.error(error)
 
 
@@ -122,7 +107,7 @@ def populate_hosts_table(conn, scan_day=datetime.today().isoweekday(), hosts_fil
         hosts_ips = generate_random_ips(permutation_elts)
         hosts = [(scan_day, ip, '', 0, 0, 0, 0, random.randint(1, 3)) for ip in hosts_ips]
     else:
-        hosts_file_full_path = f"{config['INTERNAL-DB']['hosts_file_dir']}/{hosts_file}"
+        hosts_file_full_path = f"{config['PROBING-DB']['hosts_file_dir']}/{hosts_file}"
         hosts = []
         try:
             with open(hosts_file_full_path, 'r') as file_input:
@@ -362,15 +347,16 @@ def insert_host(conn, host):
     Host is the tuple: (scan_day, ip_address, netmask, selected_for_discovery, \
                         seen_up, selected_for_scan, scanned, scan_priority)"""
     try:
-        sql = '''insert or ignore into hosts(
+        sql = '''insert into hosts(
                  scan_day, ip_address, netmask, selected_for_discovery,
                  seen_up, selected_for_scan, scanned, scan_priority)
-                 VALUES(?, ?, ?, ?, ?, ?, ?, ?)'''
+                 VALUES(%s, %s, %s, %s, %s, %s, %s, %s)
+                 on conflict do nothing'''
         cur = conn.cursor()
         cur.execute(sql, host)
         conn.commit()
         return cur.lastrowid
-    except sqlite3.Error as error:
+    except (Exception, psycopg2.DatabaseError) as error:
         logging.error(error)
 
 
@@ -380,18 +366,18 @@ def update_host_attribute(conn, attribute, value, ip_address, scan_day=datetime.
         # if selected_for_discovery -> 1, increment discovery_count
         if attribute == 'selected_for_discovery' and value == 1:
             sql = (f'update hosts set '
-                   f'{attribute} = ?, '
+                   f'{attribute} = %s, '
                    f'discovery_count = discovery_count + 1 '
-                   f'where ip_address = ? and scan_day = ?')
+                   f'where ip_address = %s and scan_day = %s')
         else:
             sql = (f'update hosts set '
-                   f'{attribute} = ? '
-                   f'where ip_address = ? and scan_day = ?')
+                   f'{attribute} = %s '
+                   f'where ip_address = %s and scan_day = %s')
         cur = conn.cursor()
         cur.execute(sql, (value, ip_address, scan_day))
         conn.commit()
         return cur.lastrowid
-    except sqlite3.Error as error:
+    except (Exception, psycopg2.DatabaseError) as error:
         logging.error(error)
 
 
@@ -402,23 +388,23 @@ def del_hosts_by_day(conn, scan_day=datetime.today().isoweekday() + 1):
         cur = conn.cursor()
         cur.execute(sql)
         conn.commit()
-    except sqlite3.Error as error:
+    except (Exception, psycopg2.DatabaseError) as error:
         logging.error(error)
 
 
 def initialise_host_attribute(conn, attribute, value, scan_day=datetime.today().isoweekday()):
     """Initialises `attribute` to `value`."""
     try:
-        sql = f'update hosts set {attribute} = ? where scan_day = ?'
+        sql = f'update hosts set {attribute} = %s where scan_day = %s'
         cur = conn.cursor()
         cur.execute(sql, (value, scan_day))
         conn.commit()
         return cur.lastrowid
-    except sqlite3.Error as error:
+    except (Exception, psycopg2.DatabaseError) as error:
         logging.error(error)
 
 
-def import_hosts(sqlite_conn, pg_conn, day_id=datetime.today().isoweekday()):
+def import_hosts(pg_conn, day_id=datetime.today().isoweekday()):
     """Imports hosts from the probing database."""
     regular_scan_cursor = None
     try:
@@ -442,21 +428,21 @@ def import_hosts(sqlite_conn, pg_conn, day_id=datetime.today().isoweekday()):
     if regular_scan_cursor is not None:
         hosts = regular_scan_cursor.fetchall()
         if len(hosts) > 0:
-            printProgressBar(0, len(hosts), prefix='Importing FPS scans:', suffix='Complete', length=50)
+            printProgressBar(0, len(hosts), prefix='Importing hosts:', suffix='Complete', length=50)
             i = 0
             for item in hosts:
-                insert_host(sqlite_conn, (day_id, item[0], '', 0, 0, 0, 0, 2))
-                printProgressBar(i + 1, len(hosts), prefix='Importing FPS scans:', suffix='Complete', length=50)
+                insert_host(pg_conn, (day_id, item[0], '', 0, 0, 0, 0, 2))
+                printProgressBar(i + 1, len(hosts), prefix='Importing hosts:', suffix='Complete', length=50)
                 i += 1
 
     if user_scan_cursor is not None:
         hosts = user_scan_cursor.fetchall()
         if len(hosts) > 0:
-            printProgressBar(0, len(hosts), prefix='Importing USER scans:', suffix='Complete', length=50)
+            printProgressBar(0, len(hosts), prefix='Importing USER hosts:', suffix='Complete', length=50)
             i = 0
             for item in hosts:
-                insert_host(sqlite_conn, (day_id, item[0], '', 0, 0, 0, 0, 1))
-                printProgressBar(i + 1, len(hosts), prefix='Importing USER scans:', suffix='Complete', length=50)
+                insert_host(pg_conn, (day_id, item[0], '', 0, 0, 0, 0, 1))
+                printProgressBar(i + 1, len(hosts), prefix='Importing USER hosts:', suffix='Complete', length=50)
                 i += 1
 
 
@@ -471,13 +457,13 @@ def get_hosts(
                f'and seen_up in ({",".join(str(val) for val in seen_up)}) '
                f'and selected_for_scan in ({",".join(str(val) for val in selected_for_scan)}) '
                f'and scanned in ({",".join(str(val) for val in scanned)}) '
-               f'and scan_day = "{scan_day}"'
+               f'and scan_day = {scan_day} '
                f'order by scan_priority'
                f'{"" if num_records is None else " limit " + str(num_records)}')
         cur = conn.cursor()
         cur.execute(sql)
         rows = cur.fetchall()
-    except sqlite3.Error as error:
+    except (Exception, psycopg2.DatabaseError) as error:
         logging.error(error)
 
     hosts_high_priority = [row[0] for row in rows if rows is not None and row[1] == rows[0][1]]
@@ -505,12 +491,12 @@ def get_hosts_count(
                f'and selected_for_scan in ({",".join(str(val) for val in selected_for_scan)}) '
                f'and scanned in ({",".join(str(val) for val in scanned)}) '
                f'and scan_priority in ({",".join(str(val) for val in scan_priority)}) '
-               f'and scan_day = "{scan_day}"')
+               f'and scan_day = {scan_day}')
         cur = conn.cursor()
         cur.execute(sql)
         value = cur.fetchone()
         return value[0]
-    except sqlite3.Error as error:
+    except (Exception, psycopg2.DatabaseError) as error:
         logging.error(error)
 
 
