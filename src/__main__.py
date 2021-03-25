@@ -104,7 +104,7 @@ if __name__ == '__main__':
 
     # 4. delete next day hosts at 11pm
     schedule.every().day.at("23:00:00").do(
-        del_hosts_by_day, pg_conn=pg_conn
+        del_hosts_by_day, conn=pg_conn
     )
 
     while True:
