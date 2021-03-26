@@ -19,28 +19,6 @@ config = configparser.ConfigParser()
 config.read('config.ini')
 
 
-def printProgressBar(iteration, total, prefix='', suffix='', decimals=1, length=100, fill='|', printEnd="\r"):
-    """
-    Call in a loop to create terminal progress bar
-    @params:
-        iteration   - Required  : current iteration (Int)
-        total       - Required  : total iterations (Int)
-        prefix      - Optional  : prefix string (Str)
-        suffix      - Optional  : suffix string (Str)
-        decimals    - Optional  : positive number of decimals in percent complete (Int)
-        length      - Optional  : character length of bar (Int)
-        fill        - Optional  : bar fill character (Str)
-        printEnd    - Optional  : end character (e.g. "\r", "\r\n") (Str)
-    """
-    percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
-    filledLength = int(length * iteration // total)
-    bar = fill * filledLength + '-' * (length - filledLength)
-    print(f'\r{prefix} |{bar}| {percent}% {suffix}', end=printEnd)
-    # Print New Line on Complete
-    if iteration == total:
-        print()
-
-
 def generate_random_ips(range_length):
     """Generates random IP addresses from the numbers in [1, range_length + 1]."""
     return [f'{subset[0]}.{subset[1]}.{subset[2]}.{subset[3]}'
@@ -444,22 +422,16 @@ def import_hosts(pg_conn, day_id=None):
     if regular_scan_cursor is not None:
         hosts = regular_scan_cursor.fetchall()
         if len(hosts) > 0:
-            printProgressBar(0, len(hosts), prefix='Importing hosts:', suffix='Complete', length=50)
-            i = 0
             for item in hosts:
                 insert_host(pg_conn, (day_id, item[0], '', 0, 0, 0, 0, 2))
-                printProgressBar(i + 1, len(hosts), prefix='Importing hosts:', suffix='Complete', length=50)
-                i += 1
+            logging.info('Imported %s hosts.', len(hosts))
 
     if user_scan_cursor is not None:
         hosts = user_scan_cursor.fetchall()
         if len(hosts) > 0:
-            printProgressBar(0, len(hosts), prefix='Importing USER hosts:', suffix='Complete', length=50)
-            i = 0
             for item in hosts:
                 insert_host(pg_conn, (day_id, item[0], '', 0, 0, 0, 0, 1))
-                printProgressBar(i + 1, len(hosts), prefix='Importing USER hosts:', suffix='Complete', length=50)
-                i += 1
+            logging.info('Imported %s user hosts.', len(hosts))
 
 
 def get_hosts(
