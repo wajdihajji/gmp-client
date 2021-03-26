@@ -421,17 +421,19 @@ def import_hosts(pg_conn, day_id=None):
 
     if regular_scan_cursor is not None:
         hosts = regular_scan_cursor.fetchall()
-        if len(hosts) > 0:
-            for item in hosts:
-                insert_host(pg_conn, (day_id, item[0], '', 0, 0, 0, 0, 2))
-            logging.info('Imported %s hosts.', len(hosts))
+
+        for item in hosts:
+            insert_host(pg_conn, (day_id, item[0], '', 0, 0, 0, 0, 2))
+
+        logging.info('Imported %s hosts on day %s.', len(hosts), day_id)
 
     if user_scan_cursor is not None:
         hosts = user_scan_cursor.fetchall()
-        if len(hosts) > 0:
-            for item in hosts:
-                insert_host(pg_conn, (day_id, item[0], '', 0, 0, 0, 0, 1))
-            logging.info('Imported %s user hosts.', len(hosts))
+
+        for item in hosts:
+            insert_host(pg_conn, (day_id, item[0], '', 0, 0, 0, 0, 1))
+
+        logging.info('Imported %s user hosts on day %s.', len(hosts), day_id)
 
 
 def get_hosts(
