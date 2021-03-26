@@ -101,8 +101,12 @@ def reset_discovery_attribute(conn):
         logging.error(error)
 
 
-def populate_hosts_table(conn, scan_day=datetime.today().isoweekday(), hosts_file='hosts.csv', permutation_elts=None):
+def populate_hosts_table(
+        conn, scan_day=None, hosts_file='hosts.csv', permutation_elts=None):
     """Initiliase hosts table with hosts in `hosts_file` or generated random IP addresses."""
+    if scan_day is None:
+        scan_day = datetime.today().isoweekday()
+
     if permutation_elts is not None:
         hosts_ips = generate_random_ips(permutation_elts)
         hosts = [(scan_day, ip, '', 0, 0, 0, 0, random.randint(1, 3)) for ip in hosts_ips]
@@ -360,8 +364,11 @@ def insert_host(conn, host):
         logging.error(error)
 
 
-def update_host_attribute(conn, attribute, value, ip_address, scan_day=datetime.today().isoweekday()):
+def update_host_attribute(conn, attribute, value, ip_address, scan_day=None):
     """Set host's `attribute` to `value`."""
+    if scan_day is None:
+        scan_day = datetime.today().isoweekday()
+
     try:
         # if selected_for_discovery -> 1, increment discovery_count
         if attribute == 'selected_for_discovery' and value == 1:
@@ -381,8 +388,11 @@ def update_host_attribute(conn, attribute, value, ip_address, scan_day=datetime.
         logging.error(error)
 
 
-def del_hosts_by_day(conn, scan_day=datetime.today().isoweekday() + 1):
+def del_hosts_by_day(conn, scan_day=None):
     """Delete hosts scheduled to scan on day `scan_day`."""
+    if scan_day is None:
+        scan_day = datetime.today().isoweekday() + 1
+
     try:
         sql = f'delete from hosts where scan_day = {scan_day}'
         cur = conn.cursor()
@@ -392,8 +402,11 @@ def del_hosts_by_day(conn, scan_day=datetime.today().isoweekday() + 1):
         logging.error(error)
 
 
-def initialise_host_attribute(conn, attribute, value, scan_day=datetime.today().isoweekday()):
+def initialise_host_attribute(conn, attribute, value, scan_day=None):
     """Initialises `attribute` to `value`."""
+    if scan_day is None:
+        scan_day = datetime.today().isoweekday()
+
     try:
         sql = f'update hosts set {attribute} = %s where scan_day = %s'
         cur = conn.cursor()
@@ -404,8 +417,11 @@ def initialise_host_attribute(conn, attribute, value, scan_day=datetime.today().
         logging.error(error)
 
 
-def import_hosts(pg_conn, day_id=datetime.today().isoweekday()):
+def import_hosts(pg_conn, day_id=None):
     """Imports hosts from the probing database."""
+    if day_id is None:
+        day_id = datetime.today().isoweekday()
+
     regular_scan_cursor = None
     try:
         sql = (f'select I.ipaddr as ipaddr from '
@@ -448,9 +464,13 @@ def import_hosts(pg_conn, day_id=datetime.today().isoweekday()):
 
 def get_hosts(
         conn, selected_for_discovery, seen_up, selected_for_scan,
-        scanned, scan_day=datetime.today().isoweekday(), num_records=None):
+        scanned, scan_day=None, num_records=None):
     """Returns the hosts where `attribute` equals `value` and having highest scan_priority."""
+    if scan_day is None:
+        scan_day = datetime.today().isoweekday()
+
     rows = None
+
     try:
         sql = (f'select ip_address, scan_priority from hosts '
                f'where selected_for_discovery in ({",".join(str(val) for val in selected_for_discovery)}) '
@@ -482,8 +502,11 @@ def get_hosts(
 
 def get_hosts_count(
         conn, selected_for_discovery, seen_up, selected_for_scan,
-        scanned, scan_priority=[1, 2, 3], scan_day=datetime.today().isoweekday()):
+        scanned, scan_priority=[1, 2, 3], scan_day=None):
     """Returns hosts count."""
+    if scan_day is None:
+        scan_day = datetime.today().isoweekday()
+
     try:
         sql = (f'select count(*) from hosts '
                f'where selected_for_discovery in ({",".join(str(val) for val in selected_for_discovery)}) '
