@@ -470,3 +470,8 @@ class GMPClient(object):
             return {'status_text': 'Task does not exist'}
 
         return gmp.start_task(task_id=task_id)
+
+    @authenticate
+    def empty_trashcan(self, gmp):
+        """Empties trashcan."""
+        return gmp.empty_trashcan()

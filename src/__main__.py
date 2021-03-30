@@ -107,6 +107,9 @@ if __name__ == '__main__':
         del_hosts_by_day, conn=pg_conn
     )
 
+    # 5. empty trashcan every sunday
+    schedule.every().sunday.do(gmp_client.empty_trashcan)
+
     while True:
         schedule.run_pending()
         time.sleep(1)
