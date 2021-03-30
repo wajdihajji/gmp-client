@@ -77,7 +77,9 @@ def create_targets(
             name=f'{name}_{idx}', hosts=sub_hosts, port_list_name=port_list_name,
             state=state)
         targets.append(f'{name}_{idx}')
-        logging.info('Create target %s: %s', f'{name}_{idx}', result.get('status_text'))
+        logging.info(
+            'Create target %s (%s hosts): %s',
+            f'{name}_{idx}', len(sub_hosts), result.get('status_text'))
 
     return targets
 
