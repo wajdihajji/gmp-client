@@ -108,7 +108,7 @@ def delete_tasks(
     return deleted_tasks
 
 
-def delete_targets(client: GMPClient, target_name=None, states=['scanned'], ultimate=True):
+def delete_targets(client: GMPClient, target_name=None, states=['scanned'], ultimate=False):
     """
     Deletes a set of targets.
 
@@ -445,7 +445,7 @@ def run_discovery(client: GMPClient, sqlite_conn):
 
     update_discovered_hosts(sqlite_conn, discovered_hosts)
 
-    deleted_tasks = delete_tasks(client, task_name=discovery_task, ultimate=True, states=['d/obsolete'])
+    deleted_tasks = delete_tasks(client, task_name=discovery_task, states=['d/obsolete'])
     deleted_targets = delete_targets(client, target_name=discovery_target, states=['d/scanned'])
 
     # If discovery task completed, and all the hosts with seen_up = 0
@@ -495,7 +495,7 @@ def run_scan(client: GMPClient, pg_conn):
 
     update_discovered_hosts(pg_conn, scanned_hosts, False)
 
-    delete_tasks(client, ultimate=True)
+    delete_tasks(client)
     delete_targets(client)
 
     # Get the hosts that have been seen up, not selected for scan and not yet scanned.
