@@ -474,4 +474,6 @@ class GMPClient(object):
     @authenticate
     def empty_trashcan(self, gmp):
         """Empties trashcan."""
+        logging.info('Emptying trashcan...')
+
         return gmp.empty_trashcan()
